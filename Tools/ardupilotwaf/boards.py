@@ -354,6 +354,10 @@ class Board:
 
         if self.with_can and not cfg.env.AP_PERIPH:
             env.AP_LIBRARIES += [
+                'AP_UAVCAN_V1',
+                'modules/uavcan_v1/libcanard/libcanard/*.c',
+                'modules/uavcan_v1/o1heap/o1heap/*.c',
+
                 'AP_UAVCAN',
                 'modules/uavcan/libuavcan/src/**/*.cpp'
                 ]
@@ -365,7 +369,9 @@ class Board:
             )
 
             env.INCLUDES += [
-                cfg.srcnode.find_dir('modules/uavcan/libuavcan/include').abspath()
+                cfg.srcnode.find_dir('modules/uavcan_v1/libcanard/libcanard').abspath(),
+                cfg.srcnode.find_dir('modules/uavcan_v1/o1heap/o1heap').abspath(),
+                cfg.srcnode.find_dir('modules/uavcan/libuavcan/include').abspath(),
             ]
 
         if cfg.options.build_dates:

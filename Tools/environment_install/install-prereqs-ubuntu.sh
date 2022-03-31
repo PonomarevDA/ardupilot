@@ -5,7 +5,6 @@ set -x
 
 if [ $EUID == 0 ]; then
     echo "Please do not run this script as root; don't sudo it!"
-    exit 1
 fi
 
 OPT="/opt"
@@ -129,9 +128,9 @@ fi
 BASE_PKGS="build-essential ccache g++ gawk git make wget"
 if [ ${RELEASE_CODENAME} == 'bionic' ]; then
     # use fixed version for package that drop python2 support
-    PYTHON_PKGS="future lxml pymavlink MAVProxy pexpect flake8==3.7.9 requests==2.27.1 monotonic==1.6 geocoder empy configparser==4.0.2 click==7.1.2 decorator==4.4.2"
+    PYTHON_PKGS="future lxml pymavlink pydsdl==1.13.0 nunavut==1.6.2 MAVProxy pexpect flake8==3.7.9 requests==2.27.1 monotonic==1.6 geocoder empy configparser==4.0.2 click==7.1.2 decorator==4.4.2"
 else
-    PYTHON_PKGS="future lxml pymavlink MAVProxy pexpect flake8 geocoder empy"
+    PYTHON_PKGS="future lxml pymavlink pydsdl==1.13.0 nunavut==1.6.2 MAVProxy pexpect flake8 geocoder empy"
 fi
 
 # add some Python packages required for commonly-used MAVProxy modules and hex file generation:

@@ -20,6 +20,7 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 
 #include <AP_UAVCAN/AP_UAVCAN.h>
+#include <AP_UAVCAN_V1/AP_UAVCAN_V1.h>
 #include <AP_PiccoloCAN/AP_PiccoloCAN.h>
 #include "AP_CANTester.h"
 #include <AP_KDECAN/AP_KDECAN.h>
@@ -29,7 +30,7 @@
 const AP_Param::GroupInfo AP_CANManager::CANDriver_Params::var_info[] = {
 
     // @Param: PROTOCOL
-    // @DisplayName: Enable use of specific protocol over virtual driver
+    // @DisplayName: Enable use of specific protocol over Virtual Driver
     // @Description: Enabling this option starts selected protocol that will use this virtual driver
     // @Values: 0:Disabled,1:DroneCAN,4:PiccoloCAN,5:CANTester,6:EFI_NWPMU,7:USD1,8:KDECAN,10:Scripting,11:Benewake,12:Scripting2
     // @User: Advanced
@@ -57,6 +58,10 @@ const AP_Param::GroupInfo AP_CANManager::CANDriver_Params::var_info[] = {
     // @Path: ../AP_PiccoloCAN/AP_PiccoloCAN.cpp
     AP_SUBGROUPPTR(_piccolocan, "PC_", 5, AP_CANManager::CANDriver_Params, AP_PiccoloCAN),
 #endif
+
+    // @Group: UC1_
+    // @Path: ../AP_UAVCAN_V1/AP_UAVCAN_V1.cpp
+    AP_SUBGROUPPTR(_uavcan_v1, "UC1_", 6, AP_CANManager::CANDriver_Params, AP_UAVCAN_V1),
 
     AP_GROUPEND
 };
