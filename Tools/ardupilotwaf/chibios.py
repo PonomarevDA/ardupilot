@@ -372,6 +372,7 @@ def setup_canmgr_build(cfg):
     env.INCLUDES += [
         cfg.srcnode.find_dir('modules/uavcan_v1/libcanard/libcanard').abspath(),
         cfg.srcnode.find_dir('modules/uavcan_v1/o1heap/o1heap').abspath(),
+        cfg.srcnode.find_dir('modules/uavcan_v1/nunavut_c_headers').abspath(),
         cfg.srcnode.find_dir('modules/uavcan/libuavcan/include').abspath(),
         ]
     cfg.get_board().with_can = True

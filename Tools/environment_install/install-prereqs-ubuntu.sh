@@ -128,9 +128,9 @@ fi
 BASE_PKGS="build-essential ccache g++ gawk git make wget"
 if [ ${RELEASE_CODENAME} == 'bionic' ]; then
     # use fixed version for package that drop python2 support
-    PYTHON_PKGS="future lxml pymavlink pydsdl==1.13.0 nunavut==1.6.2 MAVProxy pexpect flake8==3.7.9 requests==2.27.1 monotonic==1.6 geocoder empy configparser==4.0.2 click==7.1.2 decorator==4.4.2"
+    PYTHON_PKGS="future lxml pymavlink MAVProxy pexpect flake8==3.7.9 requests==2.27.1 monotonic==1.6 geocoder empy configparser==4.0.2 click==7.1.2 decorator==4.4.2"
 else
-    PYTHON_PKGS="future lxml pymavlink pydsdl==1.13.0 nunavut==1.6.2 MAVProxy pexpect flake8 geocoder empy"
+    PYTHON_PKGS="future lxml pymavlink MAVProxy pexpect flake8 geocoder empy"
 fi
 
 # add some Python packages required for commonly-used MAVProxy modules and hex file generation:
@@ -286,6 +286,7 @@ if [ ${RELEASE_CODENAME} == 'bionic' ]; then
     $PIP install --user -U pip==20.3 setuptools==44.0.0
 fi
 $PIP install --user -U $PYTHON_PKGS
+
 
 if [[ -z "${DO_AP_STM_ENV}" ]] && maybe_prompt_user "Install ArduPilot STM32 toolchain [N/y]?" ; then
     DO_AP_STM_ENV=1

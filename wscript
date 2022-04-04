@@ -535,25 +535,6 @@ def generate_dronecan_dsdlc(cfg):
         print(ret.stderr.decode('utf-8'))
         raise RuntimeError('Failed to generate DSDL C bindings')
 
-def generate_uavcan_dsdl(cfg):
-    params="--target-language c --target-endianness=little -v" # without asserts yet: --enable-serialization-asserts
-    reg_dir=cfg.srcnode.make_node('modules/uavcan_v1/public_regulated_data_types/reg').abspath()
-    uavcan_dir=cfg.srcnode.make_node('modules/uavcan_v1/public_regulated_data_types/uavcan').abspath()
-    out_dir=cfg.bldnode.make_node('modules/uavcan_v1/nunavut_out').abspath()
-
-    commands = (
-        "nnvg {} {} --lookup-dir {} --outdir {}".format(params, reg_dir, uavcan_dir, out_dir),
-        "nnvg {} {} --outdir {}".format(params, uavcan_dir, out_dir)
-    )
-    for cmd in commands:
-        ret = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if ret.returncode != 0:
-            print('Failed to run: ', cmd)
-            print(ret.stdout.decode('utf-8'))
-            print(ret.stderr.decode('utf-8'))
-            raise RuntimeError('Failed to generate DSDL C bindings')
-
-
 def collect_dirs_to_recurse(bld, globs, **kw):
     dirs = []
     globs = Utils.to_list(globs)
@@ -650,9 +631,6 @@ def _build_dynamic_sources(bld):
             name='uavcan',
             export_includes=[
                 bld.bldnode.make_node('modules/uavcan/libuavcan/include/dsdlc_generated').abspath(),
-
-                # it's better to keep it separated from DroneCAN, but let it be here for that moment
-                bld.bldnode.make_node('modules/uavcan_v1/nunavut_out').abspath(),
             ]
         )
 
@@ -759,7 +737,6 @@ def _load_pre_build(bld):
     '''allow for a pre_build() function in build modules'''
     if bld.cmd == 'clean':
         return
-    generate_uavcan_dsdl(bld)
     brd = bld.get_board()
     if bld.env.AP_PERIPH:
         dsdlc_gen_path = bld.bldnode.make_node('modules/DroneCAN/libcanard/dsdlc_generated/include').abspath()
