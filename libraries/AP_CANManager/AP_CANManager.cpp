@@ -237,6 +237,7 @@ void AP_CANManager::init()
             AP_Param::load_object_from_eeprom((CANTester*)_drivers[drv_num], CANTester::var_info);
 #endif
         } else if (drv_type[drv_num] == Driver_Type_UAVCAN_V1) {
+#if HAL_ENABLE_LIBUAVCAN_V1_DRIVERS
             _drivers[drv_num] = _drv_param[drv_num]._uavcan_v1 = new AP_UAVCAN_V1;
 
             if (_drivers[drv_num] == nullptr) {
@@ -245,6 +246,7 @@ void AP_CANManager::init()
             }
 
             AP_Param::load_object_from_eeprom((AP_UAVCAN_V1*)_drivers[drv_num], AP_UAVCAN_V1::var_info);
+#endif
         } else {
             continue;
         }
