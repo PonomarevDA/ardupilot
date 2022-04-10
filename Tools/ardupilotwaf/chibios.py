@@ -347,9 +347,9 @@ def setup_canmgr_build(cfg):
     the build based on the presence of CAN pins in hwdef.dat except for AP_Periph builds'''
     env = cfg.env
     env.AP_LIBRARIES += [
-        'AP_UAVCAN_V1',
-        'modules/uavcan_v1/libcanard/libcanard/*.c',
-        'modules/uavcan_v1/o1heap/o1heap/*.c',
+        'AP_CYPHAL',
+        'modules/cyphal/libcanard/libcanard/*.c',
+        'modules/cyphal/o1heap/o1heap/*.c',
 
         'AP_UAVCAN',
         'modules/uavcan/libuavcan/src/**/*.cpp',
@@ -370,9 +370,9 @@ def setup_canmgr_build(cfg):
 
 
     env.INCLUDES += [
-        cfg.srcnode.find_dir('modules/uavcan_v1/libcanard/libcanard').abspath(),
-        cfg.srcnode.find_dir('modules/uavcan_v1/o1heap/o1heap').abspath(),
-        cfg.srcnode.find_dir('modules/uavcan_v1/nunavut_c_headers').abspath(),
+        cfg.srcnode.find_dir('modules/cyphal/libcanard/libcanard').abspath(),
+        cfg.srcnode.find_dir('modules/cyphal/o1heap/o1heap').abspath(),
+        cfg.srcnode.find_dir('modules/cyphal/nunavut_c_headers').abspath(),
         cfg.srcnode.find_dir('modules/uavcan/libuavcan/include').abspath(),
         ]
     cfg.get_board().with_can = True
