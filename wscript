@@ -418,6 +418,7 @@ def configure(cfg):
     cfg.load('waf_unit_test')
     cfg.load('mavgen')
     cfg.load('uavcangen')
+    cfg.load('cyphalgen')
 
     cfg.env.SUBMODULE_UPDATE = cfg.options.submodule_update
 
@@ -535,6 +536,27 @@ def generate_dronecan_dsdlc(cfg):
         print(ret.stderr.decode('utf-8'))
         raise RuntimeError('Failed to generate DSDL C bindings')
 
+def generate_cyphal_dsdlc(cfg):
+    params="--target-language c --target-endianness=little -v"
+    reg_dir=cfg.srcnode.make_node('modules/cyphal/public_regulated_data_types/reg').abspath()
+    uavcan_dir=cfg.srcnode.make_node('modules/cyphal/public_regulated_data_types/uavcan').abspath()
+    out_dir=cfg.bldnode.make_node('modules/cyphal/nunavut_out').abspath()
+
+    nunavut_dir=cfg.srcnode.make_node('modules/cyphal/nunavut').abspath()
+
+    commands = (
+        "pip install {}".format(nunavut_dir),
+        "nnvg {} {} --lookup-dir {} --outdir {}".format(params, reg_dir, uavcan_dir, out_dir),
+        "nnvg {} {} --outdir {}".format(params, uavcan_dir, out_dir)
+    )
+    for cmd in commands:
+        ret = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if ret.returncode != 0:
+            print('Failed to run: ', cmd)
+            print(ret.stdout.decode('utf-8'))
+            print(ret.stderr.decode('utf-8'))
+            raise RuntimeError('Failed to generate DSDL C bindings')
+
 def collect_dirs_to_recurse(bld, globs, **kw):
     dirs = []
     globs = Utils.to_list(globs)
@@ -624,6 +646,15 @@ def _build_dynamic_sources(bld):
             )
 
     if (bld.get_board().with_can or bld.env.HAL_NUM_CAN_IFACES) and not bld.env.AP_PERIPH:
+        bld(
+            features='cyphalgen',
+            source=bld.srcnode.ant_glob('modules/cyphal/public_regulated_data_types/reg', dir=True, src=False),
+            output_dir='modules/cyphal/nunavut_out',
+            name='cyphal',
+            export_includes=[
+                bld.bldnode.make_node('modules/cyphal/nunavut_out').abspath(),
+            ]
+        )
         bld(
             features='uavcangen',
             source=bld.srcnode.ant_glob('modules/DroneCAN/DSDL/* libraries/AP_UAVCAN/dsdl/*', dir=True, src=False),
@@ -744,6 +775,10 @@ def _load_pre_build(bld):
         # check if directory exists
         if not os.path.exists(dsdlc_gen_path) or not os.listdir(dsdlc_gen_path):
             generate_dronecan_dsdlc(bld)
+
+        dsdlc_gen_path = bld.bldnode.make_node('modules/cyphal/nunavut_out').abspath()
+        if not os.path.exists(dsdlc_gen_path) or not os.listdir(dsdlc_gen_path):
+            generate_cyphal_dsdlc(bld)
     if getattr(brd, 'pre_build', None):
         brd.pre_build(bld)    
 
@@ -765,6 +800,7 @@ def build(bld):
 
     if bld.get_board().with_can:
         bld.env.AP_LIBRARIES_OBJECTS_KW['use'] += ['uavcan']
+        bld.env.AP_LIBRARIES_OBJECTS_KW['use'] += ['cyphal']
 
     _build_cmd_tweaks(bld)
 
