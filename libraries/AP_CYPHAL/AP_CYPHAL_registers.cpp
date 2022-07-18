@@ -75,6 +75,9 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
 
     {"uavcan.sub.rng.range.id"},
 
+    {"uavcan.sub.gyro.id"},
+    {"uavcan.sub.accel.id"},
+
     {"uavcan.pub.setpoint.type"},
     {"uavcan.pub.readiness.type"},
 
@@ -112,6 +115,9 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.baro.pres.type"},
 
     {"uavcan.sub.rng.range.type"},
+
+    {"uavcan.sub.gyro.type"},
+    {"uavcan.sub.accel.type"},
 };
 
 static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS> string_registers = {
@@ -151,6 +157,9 @@ static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS
     "uavcan.si.sample.temperature.Scalar",
     "uavcan.si.sample.pressure.Scalar",
     "uavcan.si.sample.length.Scalar",
+
+    "uavcan.si.sample.angular_velocity.Vector3",
+    "uavcan.si.sample.acceleration.Vector3",
 };
 
 bool CyphalRegisters::init(CyphalSubscriberManager &sub_manager, CanardInstance &ins, CanardTxQueue &tx_queue)

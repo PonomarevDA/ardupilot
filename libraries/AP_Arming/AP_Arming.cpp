@@ -964,7 +964,7 @@ bool AP_Arming::system_checks(bool report)
         const float actual_loop_rate = AP::scheduler().get_filtered_loop_rate_hz();
         const uint16_t expected_loop_rate = AP::scheduler().get_loop_rate_hz();
         const float loop_rate_pct =  actual_loop_rate / expected_loop_rate;
-        if (loop_rate_pct < 0.90) {
+        if (loop_rate_pct < 0.30) {
             check_failed(ARMING_CHECK_SYSTEM, report, "Main loop slow (%uHz < %uHz)", (unsigned)actual_loop_rate, (unsigned)expected_loop_rate);
             return false;
         }

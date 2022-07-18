@@ -63,15 +63,19 @@ enum CyphalRegister_t {
     UAVCAN_SUB_MAG_ID,
     UAVCAN_SUB_BARO_TEMPERATURE_ID,
     UAVCAN_SUB_BARO_PRESSURE_ID,
+
     UAVCAN_SUB_RNG_ID,
+
+    UAVCAN_SUB_GYRO_ID,
+    UAVCAN_SUB_ACCEL_ID,
 };
 
 
 class CyphalRegisters
 {
 public:
-    static constexpr uint8_t NUMBER_OF_INTEGER_REGISTERS = 33;
-    static constexpr uint8_t NUMBER_OF_STRING_REGISTERS = 31;
+    static constexpr uint8_t NUMBER_OF_INTEGER_REGISTERS = 35;
+    static constexpr uint8_t NUMBER_OF_STRING_REGISTERS = 33;
     static constexpr uint8_t NUMBER_OF_REGISTERS = NUMBER_OF_INTEGER_REGISTERS + NUMBER_OF_STRING_REGISTERS;
     static constexpr uint16_t CYPHAL_INVALID_REGISTER_VALUE = 65535;
 
