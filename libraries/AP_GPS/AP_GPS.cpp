@@ -47,6 +47,12 @@
 #include "AP_GPS_UAVCAN.h"
 #endif
 
+#if HAL_ENABLE_CYPHAL_DRIVERS
+#include <AP_CANManager/AP_CANManager.h>
+#include <AP_CYPHAL/AP_CYPHAL.h>
+#include "AP_GPS_CYPHAL.h"
+#endif
+
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Logger/AP_Logger.h>
 
@@ -423,6 +429,7 @@ bool AP_GPS::needs_uart(GPS_Type type) const
     case GPS_TYPE_MAV:
     case GPS_TYPE_MSP:
     case GPS_TYPE_EXTERNAL_AHRS:
+    case GPS_TYPE_CYPHAL:
         return false;
     default:
         break;
@@ -672,6 +679,11 @@ AP_GPS_Backend *AP_GPS::_detect_instance(uint8_t instance)
         dstate->auto_detected_baud = false; // specified, not detected
         return AP_GPS_UAVCAN::probe(*this, state[instance]);
 #endif
+#if HAL_ENABLE_CYPHAL_DRIVERS
+    case GPS_TYPE_CYPHAL:
+        dstate->auto_detected_baud = false; // specified, not detected
+        return AP_GPS_CYPHAL::probe(*this, state[instance]);
+#endif
         return nullptr; // We don't do anything here if UAVCAN is not supported
 #if HAL_MSP_GPS_ENABLED
     case GPS_TYPE_MSP:
@@ -902,7 +914,8 @@ void AP_GPS::update_instance(uint8_t instance)
             if (_type[instance] == GPS_TYPE_MAV ||
                 _type[instance] == GPS_TYPE_UAVCAN ||
                 _type[instance] == GPS_TYPE_UAVCAN_RTK_BASE ||
-                _type[instance] == GPS_TYPE_UAVCAN_RTK_ROVER) {
+                _type[instance] == GPS_TYPE_UAVCAN_RTK_ROVER ||
+                _type[instance] == GPS_TYPE_CYPHAL) {
                 state[instance].status = NO_FIX;
             } else {
                 // free the driver before we run the next detection, so we
