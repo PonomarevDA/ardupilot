@@ -42,7 +42,7 @@ public:
     bool add_subscriber(CyphalBaseSubscriber *subsriber);
     void fill_subscribers(uavcan_node_port_SubjectIDList_0_1& subscribers_list) const;
 private:
-    static constexpr uint8_t max_number_of_subscribers = 22;
+    static constexpr uint8_t max_number_of_subscribers = 23;
     uint8_t number_of_subscribers = 0;
     CyphalBaseSubscriber* subscribers[max_number_of_subscribers];
 };

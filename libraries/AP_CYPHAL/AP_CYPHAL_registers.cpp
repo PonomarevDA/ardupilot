@@ -68,6 +68,8 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.gps.status.id"},
     {"uavcan.sub.gps.pdop.id"},
 
+    {"uavcan.sub.mag.id"},
+
     {"uavcan.pub.setpoint.type"},
     {"uavcan.pub.readiness.type"},
 
@@ -100,6 +102,7 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.gps.sats.type"},
     {"uavcan.sub.gps.status.type"},
     {"uavcan.sub.gps.pdop.type"},
+    {"uavcan.sub.mag.type"},
 };
 
 static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS> string_registers = {
@@ -135,6 +138,7 @@ static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS
     "uavcan.primitive.scalar.Integer16",
     "uavcan.primitive.scalar.Integer16",
     "uavcan.primitive.scalar.Integer16",
+    "uavcan.si.sample.magnetic_field_strength.Vector3",
 };
 
 bool CyphalRegisters::init(CyphalSubscriberManager &sub_manager, CanardInstance &ins, CanardTxQueue &tx_queue)
