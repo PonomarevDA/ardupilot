@@ -238,6 +238,13 @@ const AP_Param::GroupInfo AP_CYPHAL::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("GPP",    29, AP_CYPHAL, _parameters_table[28], 0),
 
+    // @Param: MAG
+    // @DisplayName: Magnetometer subject id
+    // @Description: uavcan.si.sample.magnetic_field_strength.Vector3.1.0
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("MAG",    30, AP_CYPHAL, _parameters_table[29], 0),
+
     AP_GROUPEND
 };
 
