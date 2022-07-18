@@ -584,7 +584,7 @@ void AC_PosControl::stop_vel_xy_stabilisation()
 // is_active_xy - returns true if the xy position controller has been run in the previous 5 loop times
 bool AC_PosControl::is_active_xy() const
 {
-    return ((AP_HAL::micros64() - _last_update_xy_us) <= _dt * 5000000.0);
+    return ((AP_HAL::micros64() - _last_update_xy_us) <= _dt * 15000000.0);
 }
 
 /// update_xy_controller - runs the horizontal position controller correcting position, velocity and acceleration errors.
@@ -899,7 +899,7 @@ void AC_PosControl::update_pos_offset_z(float pos_offset_z)
 // is_active_z - returns true if the z position controller has been run in the previous 5 loop times
 bool AC_PosControl::is_active_z() const
 {
-    return ((AP_HAL::micros64() - _last_update_z_us) <= _dt * 5000000.0);
+    return ((AP_HAL::micros64() - _last_update_z_us) <= _dt * 15000000.0);
 }
 
 /// update_z_controller - runs the vertical position controller correcting position, velocity and acceleration errors.

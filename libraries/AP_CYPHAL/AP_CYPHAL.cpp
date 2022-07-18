@@ -266,6 +266,20 @@ const AP_Param::GroupInfo AP_CYPHAL::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("RNG",    33, AP_CYPHAL, _parameters_table[32], 0),
 
+    // @Param: GYR
+    // @DisplayName: Gyroscope subject id
+    // @Description: uavcan.si.sample.angular_velocity.Vector3.1.0
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("GYR",     34, AP_CYPHAL, _parameters_table[33], 0),
+
+    // @Param: ACC
+    // @DisplayName: Accelerometer subject id
+    // @Description: uavcan.si.sample.acceleration.Vector3.1.0
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("ACC",    35, AP_CYPHAL, _parameters_table[34], 0),
+
     AP_GROUPEND
 };
 

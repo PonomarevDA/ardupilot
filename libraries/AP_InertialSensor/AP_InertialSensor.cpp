@@ -35,6 +35,7 @@
 #include "AP_InertialSensor_ExternalAHRS.h"
 #include "AP_InertialSensor_Invensensev3.h"
 #include "AP_InertialSensor_NONE.h"
+#include "AP_InertialSensor_CYPHAL.h"
 
 /* Define INS_TIMING_DEBUG to track down scheduling issues with the main loop.
  * Output is on the debug console. */
@@ -1031,6 +1032,12 @@ AP_InertialSensor::detect_backends(void)
     const int8_t serial_port = AP::externalAHRS().get_port();
     if (serial_port >= 0) {
         ADD_BACKEND(new AP_InertialSensor_ExternalAHRS(*this, serial_port));
+    }
+#endif
+
+#if HAL_ENABLE_CYPHAL_DRIVERS
+    if (AP_InertialSensor_CYPHAL::instances_amount == 0) {
+        ADD_BACKEND(new AP_InertialSensor_CYPHAL(*this));
     }
 #endif
 
