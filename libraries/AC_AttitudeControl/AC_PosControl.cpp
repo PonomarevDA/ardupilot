@@ -590,7 +590,7 @@ void AC_PosControl::stop_vel_xy_stabilisation()
 bool AC_PosControl::is_active_xy() const
 {
     const uint32_t dt_us = AP::ins().get_last_update_usec() - _last_update_xy_us;
-    return dt_us <= _dt * 1500000.0;
+    return dt_us <= _dt * 15000000.0;
 }
 
 /// update_xy_controller - runs the horizontal position controller correcting position, velocity and acceleration errors.
@@ -905,7 +905,7 @@ void AC_PosControl::update_pos_offset_z(float pos_offset_z)
 bool AC_PosControl::is_active_z() const
 {
     const uint32_t dt_us = AP::ins().get_last_update_usec() - _last_update_z_us;
-    return dt_us <= _dt * 1500000.0;
+    return dt_us <= _dt * 15000000.0;
 }
 
 /// update_z_controller - runs the vertical position controller correcting position, velocity and acceleration errors.
