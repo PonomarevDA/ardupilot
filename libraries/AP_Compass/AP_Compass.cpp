@@ -24,6 +24,9 @@
 #if HAL_ENABLE_LIBUAVCAN_DRIVERS
 #include "AP_Compass_UAVCAN.h"
 #endif
+#if HAL_ENABLE_CYPHAL_DRIVERS
+#include "AP_Compass_CYPHAL.h"
+#endif
 #include "AP_Compass_MMC3416.h"
 #include "AP_Compass_MMC5xx3.h"
 #include "AP_Compass_MAG3110.h"
@@ -1388,6 +1391,14 @@ void Compass::_detect_backends(void)
     }
 #endif
 
+#if HAL_ENABLE_CYPHAL_DRIVERS
+    for (uint8_t i=0; i<COMPASS_MAX_BACKEND; i++) {
+        AP_Compass_Backend* _cyphal_backend = AP_Compass_CYPHAL::probe(i);
+        if (_cyphal_backend) {
+            _add_backend(_cyphal_backend);
+        }
+    }
+#endif
 
 #if HAL_ENABLE_LIBUAVCAN_DRIVERS
     if (_driver_enabled(DRIVER_UAVCAN)) {

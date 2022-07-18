@@ -41,7 +41,7 @@ public:
     void process_all(const CanardRxTransfer *transfer);
     bool add_subscriber(CyphalBaseSubscriber *subsriber);
 private:
-    static constexpr uint8_t max_number_of_subscribers = 22;
+    static constexpr uint8_t max_number_of_subscribers = 23;
     uint8_t number_of_subscribers = 0;
     CyphalBaseSubscriber* subscribers[max_number_of_subscribers];
 };
