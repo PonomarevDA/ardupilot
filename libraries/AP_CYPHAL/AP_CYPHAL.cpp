@@ -245,6 +245,20 @@ const AP_Param::GroupInfo AP_CYPHAL::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("MAG",    30, AP_CYPHAL, _parameters_table[29], 0),
 
+    // @Param: BTE
+    // @DisplayName: Baro temperature subject id
+    // @Description: uavcan.si.sample.temperature.Scalar.1.0
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("BTE",    31, AP_CYPHAL, _parameters_table[30], 0),
+
+    // @Param: BPR
+    // @DisplayName: Baro pressure subject id
+    // @Description: uavcan.si.sample.pressure.Scalar.1.0
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("BPR",    32, AP_CYPHAL, _parameters_table[31], 0),
+
     AP_GROUPEND
 };
 

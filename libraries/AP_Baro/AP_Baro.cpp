@@ -43,6 +43,9 @@
 #include "AP_Baro_DPS280.h"
 #include "AP_Baro_BMP388.h"
 #include "AP_Baro_Dummy.h"
+#if HAL_ENABLE_CYPHAL_DRIVERS
+#include "AP_Baro_CYPHAL.h"
+#endif
 #include "AP_Baro_UAVCAN.h"
 #include "AP_Baro_MSP.h"
 #include "AP_Baro_ExternalAHRS.h"
@@ -571,6 +574,11 @@ void AP_Baro::init(void)
     for(uint8_t i = 0; i < sitl->baro_count; i++) {
         ADD_BACKEND(new AP_Baro_SITL(*this));
     }
+#endif
+
+#if HAL_ENABLE_CYPHAL_DRIVERS
+    // Support only 1 module
+    ADD_BACKEND(AP_Baro_CYPHAL::probe(*this));
 #endif
 
 #if AP_BARO_UAVCAN_ENABLED
