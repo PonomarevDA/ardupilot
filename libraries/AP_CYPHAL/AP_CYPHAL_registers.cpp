@@ -67,6 +67,8 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.mag.id"},
     {"uavcan.sub.baro.temp.id"},
     {"uavcan.sub.baro.pres.id"},
+    {"uavcan.sub.gyro.id"},
+    {"uavcan.sub.accel.id"},
 };
 
 
