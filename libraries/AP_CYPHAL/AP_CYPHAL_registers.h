@@ -54,14 +54,20 @@ enum CyphalRegister_t {
     UAVCAN_SUB_POWER_3_ID,
     UAVCAN_SUB_STATUS_3_ID,
     UAVCAN_SUB_DYNAMICS_3_ID,
+
+    UAVCAN_SUB_GPS_POINT_ID,
+    UAVCAN_SUB_GPS_YAW_ID,
+    UAVCAN_SUB_GPS_SATS_ID,
+    UAVCAN_SUB_GPS_STATUS_ID,
+    UAVCAN_SUB_GPS_PDOP_ID,
 };
 
 
 class CyphalRegisters
 {
 public:
-    static constexpr uint8_t NUMBER_OF_INTEGER_REGISTERS = 24;
-    static constexpr uint8_t NUMBER_OF_STRING_REGISTERS = 22;
+    static constexpr uint8_t NUMBER_OF_INTEGER_REGISTERS = 29;
+    static constexpr uint8_t NUMBER_OF_STRING_REGISTERS = 27;
     static constexpr uint8_t NUMBER_OF_REGISTERS = NUMBER_OF_INTEGER_REGISTERS + NUMBER_OF_STRING_REGISTERS;
     static constexpr uint16_t CYPHAL_INVALID_REGISTER_VALUE = 65535;
 

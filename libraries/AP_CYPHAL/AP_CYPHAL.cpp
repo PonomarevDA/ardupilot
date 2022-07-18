@@ -203,6 +203,41 @@ const AP_Param::GroupInfo AP_CYPHAL::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("DYN4",    24, AP_CYPHAL, _parameters_table[23], 0),
 
+    // @Param: GPO
+    // @DisplayName: GPS point subject id
+    // @Description: reg.udral.physics.kinematics.geodetic.PointStateVarTs.0.1
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("GPO",    25, AP_CYPHAL, _parameters_table[24], 0),
+
+    // @Param: GPY
+    // @DisplayName: GPS yaw subject id
+    // @Description: uavcan.si.sample.pressure.Scalar.1.0
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("GPY",    26, AP_CYPHAL, _parameters_table[25], 0),
+
+    // @Param: GPSA
+    // @DisplayName: GPS satellites subject id
+    // @Description: uavcan.primitive.scalar.Integer16
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("GPSA",    27, AP_CYPHAL, _parameters_table[26], 0),
+
+    // @Param: GPST
+    // @DisplayName: GPS status subject id
+    // @Description: uavcan.primitive.scalar.Integer16
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("GPST",    28, AP_CYPHAL, _parameters_table[27], 0),
+
+    // @Param: GPPD
+    // @DisplayName: GPS pdop subject id
+    // @Description: uavcan.primitive.scalar.Integer16
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("GPP",    29, AP_CYPHAL, _parameters_table[28], 0),
+
     AP_GROUPEND
 };
 

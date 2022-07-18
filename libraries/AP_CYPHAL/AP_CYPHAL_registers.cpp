@@ -62,6 +62,12 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.status.3.id"},
     {"uavcan.sub.dynamics.3.id"},
 
+    {"uavcan.sub.gps.point.id"},
+    {"uavcan.sub.gps.yaw.id"},
+    {"uavcan.sub.gps.sats.id"},
+    {"uavcan.sub.gps.status.id"},
+    {"uavcan.sub.gps.pdop.id"},
+
     {"uavcan.pub.setpoint.type"},
     {"uavcan.pub.readiness.type"},
 
@@ -88,6 +94,12 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.power.3.type"},
     {"uavcan.sub.status.3.type"},
     {"uavcan.sub.dynamics.3.type"},
+
+    {"uavcan.sub.gps.point.type"},
+    {"uavcan.sub.gps.yaw.type"},
+    {"uavcan.sub.gps.sats.type"},
+    {"uavcan.sub.gps.status.type"},
+    {"uavcan.sub.gps.pdop.type"},
 };
 
 static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS> string_registers = {
@@ -117,6 +129,12 @@ static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS
     "reg.udral.physics.electricity.PowerTs",
     "reg.udral.service.actuator.common.Status",
     "reg.udral.physics.dynamics.rotation.PlanarTs",
+
+    "reg.udral.physics.kinematics.geodetic.PointStateVarTs",
+    "uavcan.si.sample.angle.Scalar",
+    "uavcan.primitive.scalar.Integer16",
+    "uavcan.primitive.scalar.Integer16",
+    "uavcan.primitive.scalar.Integer16",
 };
 
 bool CyphalRegisters::init(CyphalSubscriberManager &sub_manager, CanardInstance &ins, CanardTxQueue &tx_queue)
