@@ -58,6 +58,7 @@ class RangeFinder
     friend class AP_RangeFinder_Backend;
     //UAVCAN drivers are initialised in the Backend, hence list of drivers is needed there.
     friend class AP_RangeFinder_UAVCAN;
+    friend class AP_RangeFinder_CYPHAL;
 public:
     RangeFinder();
 
@@ -102,6 +103,7 @@ public:
         MSP = 32,
         USD1_CAN = 33,
         Benewake_CAN = 34,
+        CYPHAL = 35,
         SIM = 100,
     };
 

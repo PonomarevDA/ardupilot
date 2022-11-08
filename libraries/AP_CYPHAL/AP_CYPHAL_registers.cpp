@@ -25,7 +25,7 @@
 CyphalRegisters* CyphalRegisters::instance;
 
 struct RegisterCell {
-    uint8_t register_name[30]; // 30 should be enough, but this value might be increased
+    uint8_t register_name[31];
 };
 
 static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
@@ -67,6 +67,8 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.mag.id"},
     {"uavcan.sub.baro.temp.id"},
     {"uavcan.sub.baro.pres.id"},
+
+    {"uavcan.sub.rng.range.id"},
 };
 
 

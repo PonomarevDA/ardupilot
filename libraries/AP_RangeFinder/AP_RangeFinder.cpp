@@ -44,6 +44,7 @@
 #include "AP_RangeFinder_Bebop.h"
 #include "AP_RangeFinder_BLPing.h"
 #include "AP_RangeFinder_UAVCAN.h"
+#include "AP_RangeFinder_CYPHAL.h"
 #include "AP_RangeFinder_Lanbao.h"
 #include "AP_RangeFinder_LeddarVu8.h"
 #include "AP_RangeFinder_SITL.h"
@@ -570,6 +571,12 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
           yet have the driver
          */
         num_instances = MAX(num_instances, instance+1);
+#endif
+        break;
+
+    case Type::CYPHAL:
+#if HAL_ENABLE_CYPHAL_DRIVERS
+        _add_backend(new AP_RangeFinder_CYPHAL(state[instance], params[instance]), instance);
 #endif
         break;
 

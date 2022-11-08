@@ -259,6 +259,13 @@ const AP_Param::GroupInfo AP_CYPHAL::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("BPR",    32, AP_CYPHAL, _parameters_table[31], 0),
 
+    // @Param: RNG
+    // @DisplayName: Rangefinder range subject id
+    // @Description: uavcan.si.sample.length.Scalar.1.0
+    // @Range: 0 6143
+    // @User: Advanced
+    AP_GROUPINFO("RNG",    33, AP_CYPHAL, _parameters_table[32], 0),
+
     AP_GROUPEND
 };
 
