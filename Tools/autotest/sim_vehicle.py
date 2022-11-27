@@ -319,7 +319,9 @@ def do_build(opts, frame_options):
 
     waf_light = os.path.join(root_dir, "modules/waf/waf-light")
 
-    cmd_configure = [waf_light, "configure", "--board", "sitl"]
+    configure_target = frame_options.get('configure_target', 'sitl')
+
+    cmd_configure = [waf_light, "configure", "--board", configure_target]
     if opts.debug:
         cmd_configure.append("--debug")
 
@@ -370,6 +372,9 @@ def do_build(opts, frame_options):
     if opts.ubsan_abort:
         cmd_configure.append("--ubsan-abort")
 
+    for nv in opts.define:
+        cmd_configure.append("--define=%s" % nv)
+
     pieces = [shlex.split(x) for x in opts.waf_configure_args]
     for piece in pieces:
         cmd_configure.extend(piece)
@@ -379,6 +384,7 @@ def do_build(opts, frame_options):
     if opts.clean:
         run_cmd_blocking("Building clean", [waf_light, "clean"])
 
+    print(frame_options)
     cmd_build = [waf_light, "build", "--target", frame_options["waf_target"]]
     if opts.jobs is not None:
         cmd_build += ['-j', str(opts.jobs)]
@@ -620,6 +626,18 @@ def start_antenna_tracker(opts):
     os.chdir(oldpwd)
 
 
+def start_CAN_GPS(opts):
+    """Compile and run the sitl_periph_gps"""
+
+    global can_uarta
+    progress("Preparing sitl_periph_gps")
+    options = vinfo.options["sitl_periph_gps"]['frames']['gps']
+    do_build(opts, options)
+    exe = os.path.join(root_dir, 'build/sitl_periph_gps', 'bin/AP_Periph')
+    run_in_terminal_window("sitl_periph_gps",
+                           ["nice", exe])
+
+
 def start_vehicle(binary, opts, stuff, spawns=None):
     """Run the ArduPilot binary"""
 
@@ -697,6 +715,9 @@ def start_vehicle(binary, opts, stuff, spawns=None):
                 print("The parameter file (%s) does not exist" % (x,))
                 sys.exit(1)
         path = ",".join(paths)
+        if cmd_opts.count > 1:
+            # we are in a subdirectory when using -n
+            path = os.path.join("..", path)
         progress("Using defaults from (%s)" % (path,))
     if opts.flash_storage:
         cmd.append("--set-storage-flash-enabled 1")
@@ -722,7 +743,7 @@ def start_vehicle(binary, opts, stuff, spawns=None):
         path += "," + os.path.join(autotest_dir, "default_params/msposd.parm")
         subprocess.Popen([os.path.join(root_dir, "libraries/AP_MSP/Tools/msposd.py")])
 
-    if path is not None:
+    if path is not None and len(path) > 0:
         cmd.extend(["--defaults", path])
 
     if cmd_opts.start_time is not None:
@@ -967,6 +988,11 @@ group_build.add_option("", "--sitl-32bit",
                        action='store_true',
                        dest="sitl_32bit",
                        help="compile sitl using 32-bit")
+group_build.add_option("", "--configure-define",
+                       default=[],
+                       action='append',
+                       dest="define",
+                       help="create a preprocessor define")
 group_build.add_option("", "--rebuild-on-failure",
                        dest="rebuild_on_failure",
                        action='store_true',
@@ -1028,6 +1054,10 @@ group_sim.add_option("-T", "--tracker",
 group_sim.add_option("", "--enable-onvif",
                      action="store_true",
                      help="enable onvif camera control sim using AntennaTracker")
+group_sim.add_option("", "--can-gps",
+                     action='store_true',
+                     default=False,
+                     help="start a DroneCAN GPS instance (use Tools/scripts/CAN/can_sitl_nodev.sh first)")
 group_sim.add_option("-A", "--sitl-instance-args",
                      type='string',
                      default=None,
@@ -1369,6 +1399,9 @@ if cmd_opts.instance == 0:
 
 if cmd_opts.tracker:
     start_antenna_tracker(cmd_opts)
+
+if cmd_opts.can_gps:
+    start_CAN_GPS(cmd_opts)
 
 if cmd_opts.custom_location:
     location = [(float)(x) for x in cmd_opts.custom_location.split(",")]

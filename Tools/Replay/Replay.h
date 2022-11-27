@@ -14,6 +14,7 @@
  */
 
 #include <AP_Vehicle/AP_Vehicle.h>
+#include <AP_Vehicle/AP_FixedWing.h>
 
 #include "LogReader.h"
 
@@ -31,7 +32,7 @@ class ReplayVehicle : public AP_Vehicle {
 public:
     friend class Replay;
 
-    ReplayVehicle() { unused = -1; }
+    ReplayVehicle() { unused.set(-1); }
     // HAL::Callbacks implementation.
     void load_parameters(void) override;
     void get_scheduler_tasks(const AP_Scheduler::Task *&tasks,
@@ -45,7 +46,7 @@ public:
     virtual bool set_mode(const uint8_t new_mode, const ModeReason reason) override { return true; }
     virtual uint8_t get_mode() const override { return 0; }
 
-    AP_Vehicle::FixedWing aparm;
+    AP_FixedWing aparm;
 
     AP_Int32 unused; // logging is magic for Replay; this is unused
     struct LogStructure log_structure[256] = {

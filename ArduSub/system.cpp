@@ -20,12 +20,8 @@ void Sub::init_ardupilot()
 #endif
 
     // init cargo gripper
-#if GRIPPER_ENABLED == ENABLED
+#if AP_GRIPPER_ENABLED
     g2.gripper.init();
-#endif
-
-#if AC_FENCE == ENABLED
-    fence.init();
 #endif
 
     // initialise notify system
@@ -52,7 +48,11 @@ void Sub::init_ardupilot()
 #elif CONFIG_HAL_BOARD != HAL_BOARD_LINUX
     AP_Param::set_default_by_name("BARO_EXT_BUS", 1);
 #endif
-    celsius.init(barometer.external_bus());
+
+#if AP_TEMPERATURE_SENSOR_ENABLED
+    // In order to preserve Sub's previous AP_TemperatureSensor Behavior we set the Default I2C Bus Here
+    AP_Param::set_default_by_name("TEMP1_BUS", barometer.external_bus());
+#endif
 
     // setup telem slots with serial ports
     gcs().setup_uarts();
@@ -141,7 +141,7 @@ void Sub::init_ardupilot()
 #endif
 
     // initialise AP_RPM library
-#if RPM_ENABLED == ENABLED
+#if AP_RPM_ENABLED
     rpm_sensor.init();
 #endif
 

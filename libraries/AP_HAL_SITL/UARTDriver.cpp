@@ -43,6 +43,8 @@
 #include <AP_HAL/utility/packetise.h>
 #endif
 
+#include <AP_Vehicle/AP_Vehicle_Type.h>
+
 extern const AP_HAL::HAL& hal;
 
 using namespace HALSITL;
@@ -155,6 +157,10 @@ void UARTDriver::begin(uint32_t baud, uint16_t rxSpace, uint16_t txSpace)
             AP_HAL::panic("Invalid device path: %s", path);
         }
         free(s);
+    }
+
+    if (_sim_serial_device != nullptr) {
+        _sim_serial_device->set_autopilot_baud(baud);
     }
 
     if (hal.console != this) { // don't clear USB buffers (allows early startup messages to escape)

@@ -348,15 +348,14 @@ float rand_float(void)
 #endif
 }
 
+// generate a random Vector3f with each value between -1.0 and 1.0
 Vector3f rand_vec3f(void)
 {
-    Vector3f v = Vector3f(rand_float(),
-                          rand_float(),
-                          rand_float());
-    if (!is_zero(v.length())) {
-        v.normalize();
-    }
-    return v;
+    return Vector3f{
+        rand_float(),
+        rand_float(),
+        rand_float()
+    };
 }
 #endif
 
@@ -509,4 +508,14 @@ uint16_t float_to_uint16(const float v)
 uint32_t float_to_uint32(const float v)
 {
     return uint32_t(constrain_float(v, 0, UINT32_MAX));
+}
+
+uint32_t double_to_uint32(const double v)
+{
+    return uint32_t(constrain_double(v, 0, UINT32_MAX));
+}
+
+int32_t double_to_int32(const double v)
+{
+    return int32_t(constrain_double(v, INT32_MIN, UINT32_MAX));
 }

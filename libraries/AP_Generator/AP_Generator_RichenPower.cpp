@@ -15,11 +15,12 @@
 
 #include "AP_Generator_RichenPower.h"
 
-#if HAL_GENERATOR_ENABLED
+#if AP_GENERATOR_RICHENPOWER_ENABLED
 
 #include <AP_Logger/AP_Logger.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Vehicle/AP_Vehicle.h>
+#include <GCS_MAVLink/GCS.h>
 
 #include <AP_HAL/utility/sparse-endian.h>
 
@@ -512,4 +513,4 @@ bool AP_Generator_RichenPower::run()
     set_pilot_desired_runstate(RunState::RUN);
     return true;
 }
-#endif
+#endif  // AP_GENERATOR_RICHENPOWER_ENABLED

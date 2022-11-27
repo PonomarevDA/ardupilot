@@ -45,6 +45,11 @@ public:
 
     virtual void handle_msp(const MSP::msp_airspeed_data_message_t &pkt) {}
 
+#if AP_AIRSPEED_HYGROMETER_ENABLE
+    // optional hygrometer support
+    virtual bool get_hygrometer(uint32_t &last_sample_ms, float &temperature, float &humidity) { return false; }
+#endif
+
 protected:
     int8_t get_pin(void) const;
     float get_psi_range(void) const;
@@ -91,9 +96,7 @@ protected:
     }
 
     // set bus ID of this instance, for ARSPD_DEVID parameters
-    void set_bus_id(uint32_t id) {
-        frontend.param[instance].bus_id.set(int32_t(id));
-    }
+    void set_bus_id(uint32_t id);
 
     enum class DevType {
         SITL     = 0x01,

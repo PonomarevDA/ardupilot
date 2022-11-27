@@ -44,8 +44,7 @@ public:
     }
 
     /* Do not allow copies */
-    AP_AHRS_DCM(const AP_AHRS_DCM &other) = delete;
-    AP_AHRS_DCM &operator=(const AP_AHRS_DCM&) = delete;
+    CLASS_NO_COPY(AP_AHRS_DCM);
 
     // reset the current gyro drift estimate
     //  should be called if gyro offsets are recalculated
@@ -123,7 +122,7 @@ public:
     bool get_relative_position_NE_origin(Vector2f &posNE) const override;
     bool get_relative_position_D_origin(float &posD) const override;
 
-    void send_ekf_status_report(mavlink_channel_t chan) const override;
+    void send_ekf_status_report(class GCS_MAVLINK &link) const override;
 
 private:
 
@@ -144,11 +143,10 @@ private:
     static constexpr float _ki_yaw = 0.01f;
 
     // accelerometer values in the earth frame in m/s/s
-    Vector3f        _accel_ef[INS_MAX_INSTANCES];
-    Vector3f        _accel_ef_blended;
+    Vector3f        _accel_ef;
 
     // Methods
-    void            matrix_update(float _G_Dt);
+    void            matrix_update(void);
     void            normalize(void);
     void            check_matrix(void);
     bool            renorm(Vector3f const &a, Vector3f &result);

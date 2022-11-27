@@ -54,12 +54,12 @@ bool AP_GPS_NMEA::read(void)
     numc = port->available();
     while (numc--) {
         char c = port->read();
-        if (_decode(c)) {
-            parsed = true;
-        }
 #if AP_GPS_DEBUG_LOGGING_ENABLED
         log_data((const uint8_t *)&c, 1);
 #endif
+        if (_decode(c)) {
+            parsed = true;
+        }
     }
     return parsed;
 }
@@ -389,7 +389,7 @@ bool AP_GPS_NMEA::_term_complete()
                         state.ground_speed = state.velocity.xy().length();
                         _last_3D_velocity_ms = now;
                     }
-                    if (is_equal(3.0f, _ksxt.fields[10])) {
+                    if (is_equal(3.0f, float(_ksxt.fields[10]))) {
                         // have good yaw (from RTK fixed moving baseline solution)
                         _last_yaw_ms = now;
                         state.gps_yaw = _ksxt.fields[4];

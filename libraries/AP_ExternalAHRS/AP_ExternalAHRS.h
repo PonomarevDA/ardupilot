@@ -18,18 +18,14 @@
 
 #pragma once
 
+#include "AP_ExternalAHRS_config.h"
+
+#if HAL_EXTERNAL_AHRS_ENABLED
+
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Common/Location.h>
 #include <AP_NavEKF/AP_Nav_Common.h>
-
-#ifndef HAL_EXTERNAL_AHRS_ENABLED
-#define HAL_EXTERNAL_AHRS_ENABLED !HAL_MINIMIZE_FEATURES && !defined(HAL_BUILD_AP_PERIPH) && BOARD_FLASH_SIZE > 1024
-#endif
-
-#if HAL_EXTERNAL_AHRS_ENABLED
-
-#include <GCS_MAVLink/GCS_MAVLink.h>
 
 class AP_ExternalAHRS_backend;
 
@@ -91,7 +87,7 @@ public:
     void get_filter_status(nav_filter_status &status) const;
     Vector3f get_gyro(void);
     Vector3f get_accel(void);
-    void send_status_report(mavlink_channel_t chan) const;
+    void send_status_report(class GCS_MAVLINK &link) const;
 
     // update backend
     void update();

@@ -19,7 +19,7 @@ const AP_Param::GroupInfo AC_Loiter::var_info[] = {
     // @Param: ANG_MAX
     // @DisplayName: Loiter pilot angle max
     // @Description{Copter, Sub}: Loiter maximum pilot requested lean angle. Set to zero for 2/3 of PSC_ANGLE_MAX/ANGLE_MAX. The maximum vehicle lean angle is still limited by PSC_ANGLE_MAX/ANGLE_MAX
-    // @Description{Plane}: Loiter maximum pilot requested lean angle. Set to zero for 2/3 of Q_P_ANGLE_MAX/Q_ANGLE_MAX. The maximum vehicle lean angle is still limited by Q_P_ANGLE_MAX/Q_ANGLE_MAX
+    // @Description: Loiter maximum pilot requested lean angle. Set to zero for 2/3 of Q_P_ANGLE_MAX/Q_ANGLE_MAX. The maximum vehicle lean angle is still limited by Q_P_ANGLE_MAX/Q_ANGLE_MAX
     // @Units: deg
     // @Range: 0 45
     // @Increment: 1
@@ -118,8 +118,8 @@ void AC_Loiter::init_target()
     _pos_control.set_correction_speed_accel_xy(LOITER_VEL_CORRECTION_MAX, _accel_cmss);
     _pos_control.set_pos_error_max_xy_cm(LOITER_POS_CORRECTION_MAX);
 
-    // initialise position controller
-    _pos_control.init_xy_controller();
+    // initialise position controller and move target accelerations smoothly towards zero
+    _pos_control.relax_velocity_controller_xy();
 
     // initialise predicted acceleration and angles from the position controller
     _predicted_accel.x = _pos_control.get_accel_target_cmss().x;
@@ -195,8 +195,8 @@ void AC_Loiter::update(bool avoidance_on)
 // sanity check parameters
 void AC_Loiter::sanity_check_params()
 {
-    _speed_cms = MAX(_speed_cms, LOITER_SPEED_MIN);
-    _accel_cmss = MIN(_accel_cmss, GRAVITY_MSS * 100.0f * tanf(ToRad(_attitude_control.lean_angle_max_cd() * 0.01f)));
+    _speed_cms.set(MAX(_speed_cms, LOITER_SPEED_MIN));
+    _accel_cmss.set(MIN(_accel_cmss, GRAVITY_MSS * 100.0f * tanf(ToRad(_attitude_control.lean_angle_max_cd() * 0.01f))));
 }
 
 /// calc_desired_velocity - updates desired velocity (i.e. feed forward) with pilot requested acceleration and fake wind resistance

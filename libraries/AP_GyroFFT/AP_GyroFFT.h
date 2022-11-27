@@ -17,11 +17,6 @@
 #pragma once
 
 #include <AP_HAL/AP_HAL.h>
-#include <AP_Vehicle/AP_Vehicle_Type.h>
-
-#ifndef HAL_GYROFFT_ENABLED
-#define HAL_GYROFFT_ENABLED HAL_WITH_DSP
-#endif
 
 #if HAL_GYROFFT_ENABLED
 
@@ -44,8 +39,7 @@ public:
     AP_GyroFFT();
 
     // Do not allow copies
-    AP_GyroFFT(const AP_GyroFFT &other) = delete;
-    AP_GyroFFT &operator=(const AP_GyroFFT&) = delete;
+    CLASS_NO_COPY(AP_GyroFFT);
 
     void init(uint16_t loop_rate_hz);
 

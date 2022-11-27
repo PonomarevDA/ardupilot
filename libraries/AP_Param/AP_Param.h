@@ -35,6 +35,12 @@
 // optionally enable debug code for dumping keys
 #define AP_PARAM_KEY_DUMP 0
 
+#if defined(HAL_GCS_ENABLED)
+    #define AP_PARAM_DEFAULTS_ENABLED HAL_GCS_ENABLED
+#else
+    #define AP_PARAM_DEFAULTS_ENABLED 1
+#endif
+
 /*
   maximum size of embedded parameter file
  */
@@ -469,15 +475,16 @@ public:
     /// @return             The first variable in _var_info, or nullptr if
     ///                     there are none.
     ///
-    static AP_Param *      first(ParamToken *token, enum ap_var_type *ptype);
+    static AP_Param *      first(ParamToken *token, enum ap_var_type *ptype, float *default_val = nullptr);
 
     /// Returns the next variable in _var_info, recursing into groups
     /// as needed
-    static AP_Param *      next(ParamToken *token, enum ap_var_type *ptype, bool skip_disabled=false);
+    static AP_Param *      next(ParamToken *token, enum ap_var_type *ptype) { return  next(token, ptype, false); }
+    static AP_Param *      next(ParamToken *token, enum ap_var_type *ptype, bool skip_disabled, float *default_val = nullptr);
 
     /// Returns the next scalar variable in _var_info, recursing into groups
     /// as needed
-    static AP_Param *       next_scalar(ParamToken *token, enum ap_var_type *ptype);
+    static AP_Param *       next_scalar(ParamToken *token, enum ap_var_type *ptype, float *default_val = nullptr);
 
     /// get the size of a type in bytes
     static uint8_t				type_size(enum ap_var_type type);
@@ -539,7 +546,14 @@ public:
     static bool add_param(uint8_t key, uint8_t param_num, const char *pname, float default_value);
     static bool load_int32(uint16_t key, uint32_t group_element, int32_t &value);
 #endif
-    
+
+    static bool load_defaults_file(const char *filename, bool last_pass);
+
+protected:
+
+    // store default value in linked list
+    static void add_default(AP_Param *ap, float v) { add_default(ap, v, default_list); }
+
 private:
     static AP_Param *_singleton;
 
@@ -676,21 +690,19 @@ private:
                                     const ptrdiff_t group_offset,
                                     ParamToken *token,
                                     enum ap_var_type *ptype,
-                                    bool skip_disabled);
+                                    bool skip_disabled,
+                                    float *default_val);
 
     // find a default value given a pointer to a default value in flash
     static float get_default_value(const AP_Param *object_ptr, const float *def_value_ptr);
 
     static bool parse_param_line(char *line, char **vname, float &value, bool &read_only);
 
-#if HAL_OS_POSIX_IO == 1
     /*
       load a parameter defaults file. This happens as part of load_all()
      */
     static bool count_defaults_in_file(const char *filename, uint16_t &num_defaults);
     static bool read_param_defaults_file(const char *filename, bool last_pass);
-    static bool load_defaults_file(const char *filename, bool last_pass);
-#endif
 
     /*
       load defaults from embedded parameters
@@ -761,6 +773,19 @@ private:
 
     // background function for saving parameters
     void save_io_handler(void);
+
+    // Store default values from add_default() calls in linked list
+    struct defaults_list {
+        AP_Param *ap;
+        float val;
+        defaults_list *next;
+    };
+#if AP_PARAM_MAX_EMBEDDED_PARAM > 0
+    static defaults_list *embedded_default_list;
+#endif
+    static defaults_list *default_list;
+    static void add_default(AP_Param *ap, float v, defaults_list *&list);
+    static void check_default(AP_Param *ap, float *default_value);
 };
 
 namespace AP {
@@ -794,58 +819,30 @@ public:
     }
 
     // set a parameter that is an ENABLE param
-    void set_enable(const T &v) {
-        if (v != _value) {
-            invalidate_count();
-        }
-        _value = v;
-    }
+    void set_enable(const T &v);
     
     /// Sets if the parameter is unconfigured
     ///
-    void set_default(const T &v) {
-        if (!configured()) {
-            set(v);
-        }
-    }
+    void set_default(const T &v);
+
+    /// Sets parameter and default
+    ///
+    void set_and_default(const T &v);
 
     /// Value setter - set value, tell GCS
     ///
-    void set_and_notify(const T &v) {
-// We do want to compare each value, even floats, since it being the same here
-// is the result of previously setting it.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wfloat-equal"
-        if (v != _value) {
-#pragma GCC diagnostic pop
-            set(v);
-            notify();
-        }
-    }
+    void set_and_notify(const T &v);
 
     /// Combined set and save
     ///
-    void set_and_save(const T &v) {
-        bool force = fabsf((float)(_value - v)) < FLT_EPSILON;
-        set(v);
-        save(force);
-    }
+    void set_and_save(const T &v);
 
     /// Combined set and save, but only does the save if the value if
     /// different from the current ram value, thus saving us a
     /// scan(). This should only be used where we have not set() the
     /// value separately, as otherwise the value in EEPROM won't be
     /// updated correctly.
-    void set_and_save_ifchanged(const T &v) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wfloat-equal"
-        if (v == _value) {
-#pragma GCC diagnostic pop
-            return;
-        }
-        set(v);
-        save(true);
-    }
+    void set_and_save_ifchanged(const T &v);
 
     /// Conversion to T returns a reference to the value.
     ///
@@ -855,40 +852,9 @@ public:
         return _value;
     }
 
-    /// Copy assignment from T is equivalent to ::set.
-    ///
-    AP_ParamT<T,PT>& operator= (const T &v) {
-        _value = v;
-        return *this;
-    }
-
-    /// bit ops on parameters
-    ///
-    AP_ParamT<T,PT>& operator |=(const T &v) {
-        _value |= v;
-        return *this;
-    }
-
-    AP_ParamT<T,PT>& operator &=(const T &v) {
-        _value &= v;
-        return *this;
-    }
-
-    AP_ParamT<T,PT>& operator +=(const T &v) {
-        _value += v;
-        return *this;
-    }
-
-    AP_ParamT<T,PT>& operator -=(const T &v) {
-        _value -= v;
-        return *this;
-    }
-
     /// AP_ParamT types can implement AP_Param::cast_to_float
     ///
-    float cast_to_float(void) const {
-        return (float)_value;
-    }
+    float cast_to_float(void) const;
 
 protected:
     T _value;
@@ -924,36 +890,18 @@ public:
 
     /// Value setter - set value, tell GCS
     ///
-    void set_and_notify(const T &v) {
-        if (v != _value) {
-            set(v);
-            notify();
-        }
-    }
+    void set_and_notify(const T &v);
 
     /// Combined set and save
     ///
-    void set_and_save(const T &v) {
-        bool force = (_value != v);
-        set(v);
-        save(force);
-    }
+    void set_and_save(const T &v);
 
     /// Combined set and save, but only does the save if the value is
     /// different from the current ram value, thus saving us a
     /// scan(). This should only be used where we have not set() the
     /// value separately, as otherwise the value in EEPROM won't be
     /// updated correctly.
-    void set_and_save_ifchanged(const T &v) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wfloat-equal"
-        if (_value == v) {
-#pragma GCC diagnostic pop
-            return;
-        }
-        set(v);
-        save(true);
-    }
+    void set_and_save_ifchanged(const T &v);
 
 
     /// Conversion to T returns a reference to the value.
@@ -962,13 +910,6 @@ public:
     ///
     operator const T &() const {
         return _value;
-    }
-
-    /// Copy assignment from T is equivalent to ::set.
-    ///
-    AP_ParamV<T,PT>& operator=(const T &v) {
-        _value = v;
-        return *this;
     }
 
 protected:

@@ -8,15 +8,16 @@
 #include <AP_HAL/DSP.h>
 #include <AP_Math/AP_Math.h>
 #include <AP_Notify/AP_Notify.h>
-#include <AP_Vehicle/AP_Vehicle.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_AHRS/AP_AHRS_View.h>
 #include <AP_ExternalAHRS/AP_ExternalAHRS.h>
 #include <AP_GyroFFT/AP_GyroFFT.h>
+#include <AP_Vehicle/AP_Vehicle_Type.h>
 #if !APM_BUILD_TYPE(APM_BUILD_Rover)
 #include <AP_Motors/AP_Motors_Class.h>
 #endif
+#include <GCS_MAVLink/GCS.h>
 
 #include "AP_InertialSensor.h"
 #include "AP_InertialSensor_BMI160.h"
@@ -201,7 +202,7 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Range: 0.8 1.2
     // @User: Advanced
     // @Calibration: 1
-    AP_GROUPINFO("ACCSCAL",     12, AP_InertialSensor, _accel_scale[0],  0),
+    AP_GROUPINFO("ACCSCAL",     12, AP_InertialSensor, _accel_scale[0],  1.0),
 
     // @Param: ACCOFFS_X
     // @DisplayName: Accelerometer offsets of X axis
@@ -250,7 +251,7 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Calibration: 1
 
 #if INS_MAX_INSTANCES > 1
-    AP_GROUPINFO("ACC2SCAL",    14, AP_InertialSensor, _accel_scale[1],   0),
+    AP_GROUPINFO("ACC2SCAL",    14, AP_InertialSensor, _accel_scale[1],   1.0),
 #endif
 
     // @Param: ACC2OFFS_X
@@ -303,7 +304,7 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @Calibration: 1
 
 #if INS_MAX_INSTANCES > 2
-    AP_GROUPINFO("ACC3SCAL",    16, AP_InertialSensor, _accel_scale[2],   0),
+    AP_GROUPINFO("ACC3SCAL",    16, AP_InertialSensor, _accel_scale[2],   1.0),
 #endif
 
     // @Param: ACC3OFFS_X
@@ -862,14 +863,6 @@ AP_InertialSensor::init(uint16_t loop_rate)
         _start_backends();
     }
 
-    // initialise accel scale if need be. This is needed as we can't
-    // give non-zero default values for vectors in AP_Param
-    for (uint8_t i=0; i<get_accel_count(); i++) {
-        if (_accel_scale[i].get().is_zero()) {
-            _accel_scale[i].set(Vector3f(1,1,1));
-        }
-    }
-
     // calibrate gyros unless gyro calibration has been disabled
     if (gyro_calibration_timing() != GYRO_CAL_NEVER) {
         init_gyro();
@@ -1023,6 +1016,12 @@ AP_InertialSensor::detect_backends(void)
         } \
         probe_count++; \
 } while (0)
+
+#define ADD_BACKEND_INSTANCE(x, instance) if (instance == _backend_count) { ADD_BACKEND(x); }
+
+// support for adding IMUs conditioned on board type
+#define BOARD_MATCH(board_type) AP_BoardConfig::get_board_type()==AP_BoardConfig::board_type
+#define ADD_BACKEND_BOARD_MATCH(board_match, x) do { if (board_match) { ADD_BACKEND(x); } } while(0)
 
 // macro for use by HAL_INS_PROBE_LIST
 #define GET_I2C_DEVICE(bus, address) hal.i2c_mgr->get_device(bus, address)
@@ -1577,14 +1576,14 @@ AP_InertialSensor::_init_gyro()
                                 (unsigned)k,
                                 (double)ToDeg(best_diff[k]),
                                 (double)GYRO_INIT_MAX_DIFF_DPS);
-            _gyro_offset[k] = best_avg[k];
+            _gyro_offset[k].set(best_avg[k]);
             // flag calibration as failed for this gyro
             _gyro_cal_ok[k] = false;
         } else {
             _gyro_cal_ok[k] = true;
-            _gyro_offset[k] = new_gyro_offset[k];
+            _gyro_offset[k].set(new_gyro_offset[k]);
 #if HAL_INS_TEMPERATURE_CAL_ENABLE
-            caltemp_gyro[k] = 0.5 * (get_temperature(k) + start_temperature[k]);
+            caltemp_gyro[k].set(0.5 * (get_temperature(k) + start_temperature[k]));
 #endif
         }
     }
@@ -1626,6 +1625,7 @@ void AP_InertialSensor::HarmonicNotch::update_params(uint8_t instance, bool conv
     const float center_freq = calculated_notch_freq_hz[0];
     if (!is_equal(last_bandwidth_hz[instance], params.bandwidth_hz()) ||
         !is_equal(last_attenuation_dB[instance], params.attenuation_dB()) ||
+        (params.tracking_mode() == HarmonicNotchDynamicMode::Fixed && !is_equal(last_center_freq_hz[instance], center_freq)) ||
         converging) {
         filter[instance].init(gyro_rate,
                               center_freq,
@@ -1634,7 +1634,7 @@ void AP_InertialSensor::HarmonicNotch::update_params(uint8_t instance, bool conv
         last_center_freq_hz[instance] = center_freq;
         last_bandwidth_hz[instance] = params.bandwidth_hz();
         last_attenuation_dB[instance] = params.attenuation_dB();
-    } else if (!is_equal(last_center_freq_hz[instance], center_freq)) {
+    } else if (params.tracking_mode() != HarmonicNotchDynamicMode::Fixed) {
         if (num_calculated_notch_frequencies > 1) {
             filter[instance].update(num_calculated_notch_frequencies, calculated_notch_freq_hz);
         } else {
@@ -2389,8 +2389,8 @@ MAV_RESULT AP_InertialSensor::simple_accel_cal()
         DEV_PRINTF("\nFAILED\n");
         // restore old values
         for (uint8_t k=0; k<num_accels; k++) {
-            _accel_offset[k] = saved_offsets[k];
-            _accel_scale[k] = saved_scaling[k];
+            _accel_offset[k].set(saved_offsets[k]);
+            _accel_scale[k].set(saved_scaling[k]);
         }
     }
 

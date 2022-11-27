@@ -299,7 +299,6 @@ static const ap_message STREAM_EXTRA1_msgs[] = {
 };
 static const ap_message STREAM_EXTRA3_msgs[] = {
     MSG_AHRS,
-    MSG_HWSTATUS,
     MSG_SIMSTATE,
     MSG_SYSTEM_TIME,
     MSG_AHRS2,
@@ -386,7 +385,7 @@ void GCS_MAVLINK_Tracker::mavlink_check_target(const mavlink_message_t &msg)
 
     // set our sysid to the target, this ensures we lock onto a single vehicle
     if (tracker.g.sysid_target == 0) {
-        tracker.g.sysid_target = msg.sysid;
+        tracker.g.sysid_target.set(msg.sysid);
     }
 
     // send data stream request to target on all channels

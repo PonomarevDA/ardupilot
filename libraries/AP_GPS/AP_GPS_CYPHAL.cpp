@@ -19,6 +19,8 @@
 #include <AP_CYPHAL/AP_CYPHAL.h>
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_Math/definitions.h>
+#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 #include "reg/udral/physics/kinematics/geodetic/PointStateVarTs_0_1.h"
 #include "uavcan/si/sample/angle/Scalar_1_0.h"
 #include "uavcan/primitive/scalar/Integer16_1_0.h"

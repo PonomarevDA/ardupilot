@@ -39,14 +39,16 @@ public:
         AUTOROTATE =   26,  // Autonomous autorotation
         AUTO_RTL =     27,  // Auto RTL, this is not a true mode, AUTO will report as this mode if entered to perform a DO_LAND_START Landing sequence
         TURTLE =       28,  // Flip over after crash
+
+        // Mode number 127 reserved for the "drone show mode" in the Skybrush
+        // fork at https://github.com/skybrush-io/ardupilot
     };
 
     // constructor
     Mode(void);
 
     // do not allow copying
-    Mode(const Mode &other) = delete;
-    Mode &operator=(const Mode&) = delete;
+    CLASS_NO_COPY(Mode);
 
     // returns a unique number specific to this mode
     virtual Number mode_number() const = 0;
@@ -86,6 +88,11 @@ public:
     virtual int32_t wp_bearing() const { return 0; }
     virtual uint32_t wp_distance() const { return 0; }
     virtual float crosstrack_error() const { return 0.0f;}
+
+    // functions to support MAV_CMD_DO_CHANGE_SPEED
+    virtual bool set_speed_xy(float speed_xy_cms) {return false;}
+    virtual bool set_speed_up(float speed_xy_cms) {return false;}
+    virtual bool set_speed_down(float speed_xy_cms) {return false;}
 
     int32_t get_alt_above_ground_cm(void);
 
@@ -195,7 +202,7 @@ protected:
     private:
         bool _running;
         float take_off_start_alt;
-        float take_off_complete_alt ;
+        float take_off_complete_alt;
     };
 
     static _TakeOff takeoff;
@@ -225,17 +232,27 @@ public:
 
     public:
 
-        // yaw(): main product of AutoYaw; the heading:
-        float yaw();
+        // Autopilot Yaw Mode enumeration
+        enum class Mode {
+            HOLD =             0,  // hold zero yaw rate
+            LOOK_AT_NEXT_WP =  1,  // point towards next waypoint (no pilot input accepted)
+            ROI =              2,  // point towards a location held in roi (no pilot input accepted)
+            FIXED =            3,  // point towards a particular angle (no pilot input accepted)
+            LOOK_AHEAD =       4,  // point in the direction the copter is moving
+            RESETTOARMEDYAW =  5,  // point towards heading at time motors were armed
+            ANGLE_RATE =       6,  // turn at a specified rate from a starting angle
+            RATE =             7,  // turn at a specified rate (held in auto_yaw_rate)
+            CIRCLE =           8,  // use AC_Circle's provided yaw (used during Loiter-Turns commands)
+            PILOT_RATE =       9,  // target rate from pilot stick
+        };
 
         // mode(): current method of determining desired yaw:
-        autopilot_yaw_mode mode() const { return (autopilot_yaw_mode)_mode; }
+        Mode mode() const { return _mode; }
         void set_mode_to_default(bool rtl);
-        void set_mode(autopilot_yaw_mode new_mode);
-        autopilot_yaw_mode default_mode(bool rtl) const;
+        void set_mode(Mode new_mode);
+        Mode default_mode(bool rtl) const;
 
-        // rate_cds(): desired yaw rate in centidegrees/second:
-        float rate_cds() const;
+
         void set_rate(float new_rate_cds);
 
         // set_roi(...): set a "look at" location:
@@ -248,17 +265,25 @@ public:
 
         void set_yaw_angle_rate(float yaw_angle_d, float yaw_rate_ds);
 
-        bool fixed_yaw_slew_finished() { return is_zero(_fixed_yaw_offset_cd); }
+        bool reached_fixed_yaw_target();
+
+        AC_AttitudeControl::HeadingCommand get_heading();
 
     private:
+
+        // yaw(): main product of AutoYaw; the heading:
+        float yaw();
+
+        // rate_cds(): desired yaw rate in centidegrees/second:
+        float rate_cds() const;
 
         float look_ahead_yaw();
         float roi_yaw() const;
 
         // auto flight mode's yaw mode
-        uint8_t _mode = AUTO_YAW_LOOK_AT_NEXT_WP;
+        Mode _mode = Mode::LOOK_AT_NEXT_WP;
 
-        // Yaw will point at this location if mode is set to AUTO_YAW_ROI
+        // Yaw will point at this location if mode is set to Mode::ROI
         Vector3f roi;
 
         // yaw used for YAW_FIXED yaw_mode
@@ -276,6 +301,7 @@ public:
         // turn rate (in cds) when auto_yaw_mode is set to AUTO_YAW_RATE
         float _yaw_angle_cd;
         float _yaw_rate_cds;
+        float _pilot_yaw_rate_cds;
     };
     static AutoYaw auto_yaw;
 
@@ -288,7 +314,6 @@ public:
     bool set_mode(Mode::Number mode, ModeReason reason);
     void set_land_complete(bool b);
     GCS_Copter &gcs();
-    void set_throttle_takeoff(void);
     uint16_t get_pilot_speed_dn(void);
     // end pass-through functions
 };
@@ -443,6 +468,10 @@ public:
     bool is_taking_off() const override;
     bool use_pilot_yaw() const override;
 
+    bool set_speed_xy(float speed_xy_cms) override;
+    bool set_speed_up(float speed_up_cms) override;
+    bool set_speed_down(float speed_down_cms) override;
+
     bool requires_terrain_failsafe() const override { return true; }
 
     // return true if this flight mode supports user takeoff
@@ -458,7 +487,7 @@ public:
     bool jump_to_landing_sequence_auto_RTL(ModeReason reason);
 
     // lua accessors for nav script time support
-    bool nav_script_time(uint16_t &id, uint8_t &cmd, float &arg1, float &arg2);
+    bool nav_script_time(uint16_t &id, uint8_t &cmd, float &arg1, float &arg2, int16_t &arg3, int16_t &arg4);
     void nav_script_time_done(uint16_t id);
 
     AP_Mission mission{
@@ -507,7 +536,7 @@ private:
 
     void payload_place_run();
     bool payload_place_run_should_run();
-    void payload_place_run_loiter();
+    void payload_place_run_hover();
     void payload_place_run_descend();
     void payload_place_run_release();
 
@@ -624,6 +653,8 @@ private:
         uint8_t timeout_s;  // timeout (in seconds) provided by mission command
         float arg1;         // 1st argument provided by mission command
         float arg2;         // 2nd argument provided by mission command
+        int16_t arg3;       // 3rd argument provided by mission command
+        int16_t arg4;       // 4th argument provided by mission command
     } nav_scripting;
 #endif
 
@@ -751,7 +782,6 @@ protected:
 private:
 
     // Circle
-    bool pilot_yaw_override = false; // true if pilot is overriding yaw
     bool speed_changing = false;     // true when the roll stick is being held to facilitate stopping at 0 rate
 };
 
@@ -824,7 +854,7 @@ private:
 };
 
 
-#if !HAL_MINIMIZE_FEATURES && AP_OPTICALFLOW_ENABLED
+#if MODE_FLOWHOLD_ENABLED == ENABLED
 /*
   class to support FLOWHOLD mode, which is a position hold mode using
   optical flow directly, avoiding the need for a rangefinder
@@ -910,7 +940,7 @@ private:
     // last time there was significant stick input
     uint32_t last_stick_input_ms;
 };
-#endif // AP_OPTICALFLOW_ENABLED
+#endif // MODE_FLOWHOLD_ENABLED
 
 
 class ModeGuided : public Mode {
@@ -967,6 +997,10 @@ public:
     bool limit_check();
 
     bool is_taking_off() const override;
+    
+    bool set_speed_xy(float speed_xy_cms) override;
+    bool set_speed_up(float speed_up_cms) override;
+    bool set_speed_down(float speed_down_cms) override;
 
     // initialises position controller to implement take-off
     // takeoff_alt_cm is interpreted as alt-above-home (in cm) or alt-above-terrain if a rangefinder is available
@@ -1492,7 +1526,7 @@ public:
     bool is_autopilot() const override { return false; }
     bool logs_attitude() const override { return true; }
 
-    void set_magnitude(float input) { waveform_magnitude = input; }
+    void set_magnitude(float input) { waveform_magnitude.set(input); }
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -1626,8 +1660,12 @@ protected:
     const char *name4() const override { return "TRTL"; }
 
 private:
+    void arm_motors();
+    void disarm_motors();
+
     float motors_output;
     Vector2f motors_input;
+    uint32_t last_throttle_warning_output_ms;
 };
 #endif
 
@@ -1754,7 +1792,7 @@ private:
 
     // parameters
     AP_Int8  _auto_enabled;    // top level enable/disable control
-#if SPRAYER_ENABLED == ENABLED
+#if HAL_SPRAYER_ENABLED
     AP_Int8  _spray_enabled;   // auto spray enable/disable
 #endif
     AP_Int8  _wp_delay;        // delay for zigzag waypoint

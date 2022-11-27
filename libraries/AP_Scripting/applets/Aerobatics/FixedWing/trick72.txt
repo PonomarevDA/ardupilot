@@ -1,0 +1,56 @@
+# example airshow in a loadable file
+# to use the airshow put the file on your microSD in the root
+# directory with name trickNN.txt where NN is the command ID you want
+# to assign. The trick can then be used in auto missions or in
+# TRIKn_ID commands for tricks on a switch
+
+# you can use name: to give your sequence a name
+name: SuperAirShow
+
+# you can add messages to display on the GCS/OSD while flying
+message: Loop
+loop 25 0 1
+
+align_box 1
+message: HalfReverseCubanEight
+half_reverse_cuban_eight   25
+
+message: ScaleFigureEight
+align_center
+scale_figure_eight -40 -45
+
+message: Immelmann
+align_box 1
+immelmann_turn 30
+
+message: StraightAlign
+message: Roll
+align_center
+straight_roll 80 2
+
+message: Split-S
+align_box 1
+split_s  30
+
+message: RollingCircle
+align_center
+rolling_circle -50 2
+
+message: HumptyBump
+align_box 1
+humpty_bump 20 60
+
+message: HalfCubanEight
+align_box 1
+half_cuban_eight 25
+
+align_center
+message: BarrelRoll
+barrel_roll 30 100 2
+
+message: ProcedureTurn
+align_box 1
+procedure_turn 30 45 30
+
+# get back to the start point
+straight_align 0

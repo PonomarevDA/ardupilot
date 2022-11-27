@@ -36,15 +36,7 @@ void GCS::get_sensor_status_flags(uint32_t &present,
     health = control_sensors_health;
 }
 
-MissionItemProtocol_Waypoints *GCS::_missionitemprotocol_waypoints;
-MissionItemProtocol_Rally *GCS::_missionitemprotocol_rally;
-MissionItemProtocol_Fence *GCS::_missionitemprotocol_fence;
-
-const MAV_MISSION_TYPE GCS_MAVLINK::supported_mission_types[] = {
-    MAV_MISSION_TYPE_MISSION,
-    MAV_MISSION_TYPE_RALLY,
-    MAV_MISSION_TYPE_FENCE,
-};
+MissionItemProtocol *GCS::missionitemprotocols[3];
 
 void GCS::init()
 {
@@ -267,7 +259,7 @@ void GCS::update_sensor_status_flags()
     }
 #endif
 
-#if !defined(HAL_BUILD_AP_PERIPH)
+#if !defined(HAL_BUILD_AP_PERIPH) && AP_FENCE_ENABLED
     const AC_Fence *fence = AP::fence();
     if (fence != nullptr) {
         if (fence->sys_status_enabled()) {
@@ -295,6 +287,17 @@ void GCS::update_sensor_status_flags()
         if (airspeed->all_healthy() && (!use || enabled)) {
             control_sensors_health |= MAV_SYS_STATUS_SENSOR_DIFFERENTIAL_PRESSURE;
         }
+    }
+#endif
+
+#if AP_OPTICALFLOW_ENABLED
+    const AP_OpticalFlow *optflow = AP::opticalflow();
+    if (optflow && optflow->enabled()) {
+        control_sensors_present |= MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW;
+        control_sensors_enabled |= MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW;
+    }
+    if (optflow && optflow->healthy()) {
+        control_sensors_health |= MAV_SYS_STATUS_SENSOR_OPTICAL_FLOW;
     }
 #endif
 

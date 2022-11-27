@@ -1022,6 +1022,21 @@ const AP_Param::GroupInfo AP_OSD_Screen::var_info2[] = {
     // @Range: 0 15
     AP_SUBGROUPINFO(link_quality, "LINK_Q", 1, AP_OSD_Screen, AP_OSD_Setting),
 
+#if HAL_WITH_MSP_DISPLAYPORT
+    // @Param: TXT_RES
+    // @DisplayName: Sets the overlay text resolution (MSP DisplayPort only)
+    // @Description: Sets the overlay text resolution for this screen to either LD 30x16 or HD 50x18 (MSP DisplayPort only)
+    // @Values: 0:30x16,1:50x18
+    // @User: Standard
+    AP_GROUPINFO("TXT_RES", 3, AP_OSD_Screen, txt_resolution, 0),
+
+    // @Param: FONT
+    // @DisplayName: Sets the font index for this screen (MSP DisplayPort only)
+    // @Description: Sets the font index for this screen (MSP DisplayPort only)
+    // @Range: 0 15
+    // @User: Standard
+    AP_GROUPINFO("FONT", 4, AP_OSD_Screen, font_index, 0),
+#endif
     AP_GROUPEND
 };
 
@@ -1290,7 +1305,7 @@ void AP_OSD_Screen::draw_avgcellvolt(uint8_t x, uint8_t y)
     uint8_t p = (100 - pct) / 16.6;
     float v = battery.voltage();
     // calculate cell count - WARNING this can be inaccurate if the LIPO/LIION  battery is far from fully charged when attached and is used in this panel
-    osd->max_battery_voltage = MAX(osd->max_battery_voltage,v);
+    osd->max_battery_voltage.set(MAX(osd->max_battery_voltage,v));
     if (osd->cell_count > 0) {
         v = v / osd->cell_count;
         backend->write(x,y, v < osd->warn_avgcellvolt, "%c%1.2f%c", SYMBOL(SYM_BATT_FULL) + p, v, SYMBOL(SYM_VOLT));
@@ -1891,7 +1906,7 @@ void AP_OSD_Screen::draw_stat(uint8_t x, uint8_t y)
     backend->write(x+2, y, false, "%c%c%c", 0x4d,0x41,0x58);
     backend->write(x, y+1, false, "%c",SYMBOL(SYM_GSPD));
     backend->write(x+1, y+1, false, "%4d%c", (int)u_scale(SPEED, osd->_stats.max_speed_mps), u_icon(SPEED));
-    backend->write(x, y+2, false, "%5.1f%c", (double)osd->_stats.max_current_a, SYM_AMP);
+    backend->write(x, y+2, false, "%5.1f%c", (double)osd->_stats.max_current_a, SYMBOL(SYM_AMP));
     backend->write(x, y+3, false, "%5d%c", (int)u_scale(ALTITUDE, osd->_stats.max_alt_m), u_icon(ALTITUDE));
     backend->write(x, y+4, false, "%c", SYMBOL(SYM_HOME));
     draw_distance(x+1, y+4, osd->_stats.max_dist_m);
@@ -2124,7 +2139,7 @@ void AP_OSD_Screen::draw_hgt_abvterr(uint8_t x, uint8_t y)
 }
 #endif
 
-
+#if AP_FENCE_ENABLED
 void AP_OSD_Screen::draw_fence(uint8_t x, uint8_t y)
 {
     AC_Fence *fenceptr = AP::fence();
@@ -2137,6 +2152,7 @@ void AP_OSD_Screen::draw_fence(uint8_t x, uint8_t y)
         backend->write(x, y, false, "%c", SYMBOL(SYM_FENCE_DISABLED));
     }
 }
+#endif
 
 void AP_OSD_Screen::draw_rngf(uint8_t x, uint8_t y)
 {
@@ -2200,7 +2216,9 @@ void AP_OSD_Screen::draw(void)
     DRAW_SETTING(heading);
     DRAW_SETTING(wind);
     DRAW_SETTING(home);
+#if AP_FENCE_ENABLED
     DRAW_SETTING(fence);
+#endif
     DRAW_SETTING(roll_angle);
     DRAW_SETTING(pitch_angle);
     DRAW_SETTING(temp);

@@ -16,7 +16,15 @@
 #include "AP_MotorsMulticopter.h"
 #include <AP_HAL/AP_HAL.h>
 #include <AP_BattMonitor/AP_BattMonitor.h>
+#include <SRV_Channel/SRV_Channel.h>
 #include <AP_Logger/AP_Logger.h>
+
+#include <AP_Vehicle/AP_Vehicle_Type.h>
+#if APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+    #define AP_MOTORS_PARAM_PREFIX "Q_M_"
+#else
+    #define AP_MOTORS_PARAM_PREFIX "MOT_"
+#endif
 
 extern const AP_HAL::HAL& hal;
 
@@ -103,7 +111,7 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @Param: SPIN_MIN
     // @DisplayName: Motor Spin minimum
     // @Description: Point at which the thrust starts expressed as a number from 0 to 1 in the entire output range.  Should be higher than MOT_SPIN_ARM.
-    // @Values: 0.0:Low, 0.15:Default, 0.3:High
+    // @Values: 0.0:Low, 0.15:Default, 0.25:High
     // @User: Advanced
     AP_GROUPINFO("SPIN_MIN", 18, AP_MotorsMulticopter, _spin_min, AP_MOTORS_SPIN_MIN_DEFAULT),
 
@@ -382,7 +390,7 @@ void AP_MotorsMulticopter::update_lift_max_from_batt_voltage()
         return;
     }
 
-    _batt_voltage_min = MAX(_batt_voltage_min, _batt_voltage_max * 0.6f);
+    _batt_voltage_min.set(MAX(_batt_voltage_min, _batt_voltage_max * 0.6f));
 
     // contrain resting voltage estimate (resting voltage is actual voltage with sag removed based on current draw and resistance)
     _batt_voltage_resting_estimate = constrain_float(_batt_voltage_resting_estimate, _batt_voltage_min, _batt_voltage_max);
@@ -516,8 +524,8 @@ void AP_MotorsMulticopter::update_throttle_range()
     // if all outputs are digital adjust the range. We also do this for type PWM_RANGE, as those use the
     // scaled output, which is then mapped to PWM via the SRV_Channel library
     if (SRV_Channels::have_digital_outputs(get_motor_mask()) || (_pwm_type == PWM_TYPE_PWM_RANGE)) {
-        _pwm_min = 1000;
-        _pwm_max = 2000;
+        _pwm_min.set_and_default(1000);
+        _pwm_max.set_and_default(2000);
     }
 
     hal.rcout->set_esc_scaling(get_pwm_output_min(), get_pwm_output_max());
@@ -528,7 +536,7 @@ void AP_MotorsMulticopter::update_throttle_hover(float dt)
 {
     if (_throttle_hover_learn != HOVER_LEARN_DISABLED) {
         // we have chosen to constrain the hover throttle to be within the range reachable by the third order expo polynomial.
-        _throttle_hover = constrain_float(_throttle_hover + (dt / (dt + AP_MOTORS_THST_HOVER_TC)) * (get_throttle() - _throttle_hover), AP_MOTORS_THST_HOVER_MIN, AP_MOTORS_THST_HOVER_MAX);
+        _throttle_hover.set(constrain_float(_throttle_hover + (dt / (dt + AP_MOTORS_THST_HOVER_TC)) * (get_throttle() - _throttle_hover), AP_MOTORS_THST_HOVER_MIN, AP_MOTORS_THST_HOVER_MAX));
     }
 }
 
@@ -611,7 +619,10 @@ void AP_MotorsMulticopter::output_logic()
             // constrain ramp value and update mode
             if (_spin_up_ratio >= 1.0f) {
                 _spin_up_ratio = 1.0f;
-                _spool_state = SpoolState::SPOOLING_UP;
+                if (!get_spoolup_block()) {
+                    // Only advance from ground idle if spoolup checks have passed
+                    _spool_state = SpoolState::SPOOLING_UP;
+                }
             }
             break;
 
@@ -797,4 +808,41 @@ void AP_MotorsMulticopter::convert_pwm_min_max_param(int16_t radio_min, int16_t 
     }
     _pwm_min.set_and_save(radio_min);
     _pwm_max.set_and_save(radio_max);
+}
+
+bool AP_MotorsMulticopter::arming_checks(size_t buflen, char *buffer) const
+{
+    // run base class checks
+    if (!AP_Motors::arming_checks(buflen, buffer)) {
+        return false;
+    }
+
+    // Check output function is setup for each motor
+    for (uint8_t i = 0; i < AP_MOTORS_MAX_NUM_MOTORS; i++) {
+        if (!motor_enabled[i]) {
+            continue;
+        }
+        uint8_t chan;
+        SRV_Channel::Aux_servo_function_t function = SRV_Channels::get_motor_function(i);
+        if (!SRV_Channels::find_channel(function, chan)) {
+            hal.util->snprintf(buffer, buflen, "no SERVOx_FUNCTION set to Motor%u", i + 1);
+            return false;
+        }
+    }
+
+    // Check param config
+    if (_spin_min > 0.3) {
+        hal.util->snprintf(buffer, buflen, "%sSPIN_MIN too high %.2f > 0.3", AP_MOTORS_PARAM_PREFIX, _spin_min.get());
+        return false;
+    }
+    if (_spin_arm > _spin_min) {
+        hal.util->snprintf(buffer, buflen, "%sSPIN_ARM > %sSPIN_MIN", AP_MOTORS_PARAM_PREFIX, AP_MOTORS_PARAM_PREFIX);
+        return false;
+    }
+    if (!check_mot_pwm_params()) {
+        hal.util->snprintf(buffer, buflen, "Check %sPWM_MIN and %sPWM_MAX", AP_MOTORS_PARAM_PREFIX, AP_MOTORS_PARAM_PREFIX);
+        return false;
+    }
+
+    return true;
 }

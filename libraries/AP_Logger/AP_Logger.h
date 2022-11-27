@@ -3,7 +3,7 @@
 /* ************************************************************ */
 #pragma once
 
-#include <AP_Filesystem/AP_Filesystem_Available.h>
+#include <AP_Filesystem/AP_Filesystem_config.h>
 
 #ifndef HAL_LOGGING_ENABLED
 #define HAL_LOGGING_ENABLED 1
@@ -54,25 +54,25 @@
 #define REPLAY_LOG_NEW_MSG_MAX 230
 #define REPLAY_LOG_NEW_MSG_MIN 220
 
-#include <AC_PID/AC_PID.h>
 #include <AP_HAL/AP_HAL.h>
-#include <AP_AHRS/AP_AHRS.h>
-#include <AP_AHRS/AP_AHRS_DCM.h>
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Mission/AP_Mission.h>
 #include <AP_Logger/LogStructure.h>
-#include <AP_Motors/AP_Motors.h>
-#include <AP_Rally/AP_Rally.h>
 #include <AP_Vehicle/ModeReason.h>
+
+#include <AC_Fence/AC_Fence_config.h>
+#define HAL_LOGGER_FENCE_ENABLED (AP_FENCE_ENABLED && !defined(HAL_BUILD_AP_PERIPH))
+
+#if HAL_LOGGER_FENCE_ENABLED
+    #include <AC_Fence/AC_Fence.h>
+#endif
 
 #include <stdint.h>
 
 #include "LoggerMessageWriter.h"
 
 class AP_Logger_Backend;
-class AP_AHRS;
-class AP_AHRS_View;
 
 // do not do anything here apart from add stuff; maintaining older
 // entries means log analysis is easier
@@ -244,8 +244,7 @@ public:
     AP_Logger(const AP_Int32 &log_bitmask);
 
     /* Do not allow copies */
-    AP_Logger(const AP_Logger &other) = delete;
-    AP_Logger &operator=(const AP_Logger&) = delete;
+    CLASS_NO_COPY(AP_Logger);
 
     // get singleton instance
     static AP_Logger *get_singleton(void) {
@@ -257,6 +256,12 @@ public:
     void set_num_types(uint8_t num_types) { _num_types = num_types; }
 
     bool CardInserted(void);
+    bool _log_pause;
+
+    // pause logging if aux switch is active and log rate limit enabled
+    void log_pause(bool value) {
+        _log_pause = value;
+    }
 
     // erase handling
     void EraseAll();
@@ -295,6 +300,9 @@ public:
     void Write_RCOUT(void);
     void Write_RSSI();
     void Write_Rally();
+#if HAL_LOGGER_FENCE_ENABLED
+    void Write_Fence();
+#endif
     void Write_Power(void);
     void Write_Radio(const mavlink_radio_t &packet);
     void Write_Message(const char *message);
@@ -313,7 +321,7 @@ public:
                                const AP_Mission::Mission_Command &cmd);
     void Write_RallyPoint(uint8_t total,
                           uint8_t sequence,
-                          const RallyLocation &rally_point);
+                          const class RallyLocation &rally_point);
     void Write_SRTL(bool active, uint16_t num_points, uint16_t max_points, uint8_t action, const Vector3f& point);
     void Write_Winch(bool healthy, bool thread_end, bool moving, bool clutch, uint8_t mode, float desired_length, float length, float desired_rate, uint16_t tension, float voltage, int8_t temp);
     void Write_PSCN(float pos_target, float pos, float vel_desired, float vel_target, float vel, float accel_desired, float accel_target, float accel);
@@ -328,7 +336,7 @@ public:
     void WriteCritical(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, ...);
     void WriteV(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, va_list arg_list, bool is_critical=false, bool is_streaming=false);
 
-    void Write_PID(uint8_t msg_type, const AP_PIDInfo &info);
+    void Write_PID(uint8_t msg_type, const class AP_PIDInfo &info);
 
     // returns true if logging of a message should be attempted
     bool should_log(uint32_t mask) const;
@@ -427,7 +435,7 @@ public:
     } *log_write_fmts;
 
     // return (possibly allocating) a log_write_fmt for a name
-    struct log_write_fmt *msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, const bool direct_comp = false);
+    struct log_write_fmt *msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, const bool direct_comp = false, const bool copy_strings = false);
 
     // output a FMT message for each backend if not already done so
     void Safe_Write_Emit_FMT(log_write_fmt *f);
@@ -516,6 +524,14 @@ private:
     bool _writes_enabled:1;
     bool _force_log_disarmed:1;
     bool _force_long_log_persist:1;
+
+    struct log_write_fmt_strings {
+        char name[LS_NAME_SIZE];
+        char format[LS_FORMAT_SIZE];
+        char labels[LS_LABELS_SIZE];
+        char units[LS_UNITS_SIZE];
+        char multipliers[LS_MULTIPLIERS_SIZE];
+    };
 
     // remember formats for replay
     void save_format_Replay(const void *pBuffer);

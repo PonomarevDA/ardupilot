@@ -70,7 +70,7 @@ Aircraft::Aircraft(const char *frame_str) :
     }
 
     // init rangefinder array to -1 to signify no data
-    for (uint8_t i = 0; i < RANGEFINDER_MAX_INSTANCES; i++){
+    for (uint8_t i = 0; i < ARRAY_SIZE(rangefinder_m); i++){
         rangefinder_m[i] = -1.0f;
     }
 }
@@ -390,9 +390,8 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
     fdm.velocity_air_bf = velocity_air_bf;
     fdm.battery_voltage = battery_voltage;
     fdm.battery_current = battery_current;
-    fdm.num_motors = num_motors;
-    fdm.vtol_motor_start = vtol_motor_start;
-    memcpy(fdm.rpm, rpm, num_motors * sizeof(float));
+    fdm.motor_mask = motor_mask | sitl->vibe_motor_mask;
+    memcpy(fdm.rpm, rpm, sizeof(fdm.rpm));
     fdm.rcin_chan_count = rcin_chan_count;
     fdm.range = rangefinder_range();
     memcpy(fdm.rcin, rcin, rcin_chan_count * sizeof(float));
@@ -407,6 +406,8 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
 
     fdm.wind_vane_apparent.direction = wind_vane_apparent.direction;
     fdm.wind_vane_apparent.speed = wind_vane_apparent.speed;
+
+    fdm.wind_ef = wind_ef;
 
     if (is_smoothed) {
         fdm.xAccel = smoothing.accel_body.x;
@@ -445,7 +446,7 @@ void Aircraft::fill_fdm(struct sitl_fdm &fdm)
 
     // in the first call here, if a speedup option is specified, overwrite it
     if (is_equal(last_speedup, -1.0f) && !is_equal(get_speedup(), 1.0f)) {
-        sitl->speedup = get_speedup();
+        sitl->speedup.set(get_speedup());
     }
     
     if (!is_equal(last_speedup, float(sitl->speedup)) && sitl->speedup > 0) {
@@ -952,7 +953,7 @@ void Aircraft::update_external_payload(const struct sitl_input &input)
 
     {
         const float range = rangefinder_range();
-        for (uint8_t i=0; i<RANGEFINDER_MAX_INSTANCES; i++) {
+        for (uint8_t i=0; i<ARRAY_SIZE(rangefinder_m); i++) {
             rangefinder_m[i] = range;
         }
     }
@@ -987,7 +988,7 @@ void Aircraft::update_external_payload(const struct sitl_input &input)
     if (precland && precland->is_enabled()) {
         precland->update(get_location(), get_position_relhome());
         if (precland->_over_precland_base) {
-            local_ground_level += precland->_origin_height;
+            local_ground_level += precland->_device_height;
         }
     }
 
@@ -1029,7 +1030,7 @@ void Aircraft::add_shove_forces(Vector3f &rot_accel, Vector3f &body_accel)
         body_accel.z += sitl->shove.z;
     } else {
         sitl->shove.start_ms = 0;
-        sitl->shove.t = 0;
+        sitl->shove.t.set(0);
     }
 }
 
@@ -1118,7 +1119,7 @@ void Aircraft::add_twist_forces(Vector3f &rot_accel)
         rot_accel.z += sitl->twist.z;
     } else {
         sitl->twist.start_ms = 0;
-        sitl->twist.t = 0;
+        sitl->twist.t.set(0);
     }
 }
 

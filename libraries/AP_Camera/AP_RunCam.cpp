@@ -34,7 +34,7 @@ const AP_Param::GroupInfo AP_RunCam::var_info[] = {
     // @Param: TYPE
     // @DisplayName: RunCam device type
     // @Description: RunCam deviee type used to determine OSD menu structure and shutter options.
-    // @Values: 0:Disabled, 1:RunCam Split Micro/RunCam with UART, 2:RunCam Split, 3:RunCam Split4 4k, 4:RunCam Hybrid
+    // @Values: 0:Disabled, 1:RunCam Split Micro/RunCam with UART, 2:RunCam Split, 3:RunCam Split4 4k, 4:RunCam Hybrid/RunCam Thumb Pro
     AP_GROUPINFO_FLAGS("TYPE", 1, AP_RunCam, _cam_type, int(DeviceType::Disabled), AP_PARAM_FLAG_ENABLE),
 
     // @Param: FEATURES
@@ -123,7 +123,7 @@ AP_RunCam::AP_RunCam()
         AP_HAL::panic("AP_RunCam must be singleton");
     }
     _singleton = this;
-    _cam_type = constrain_int16(_cam_type, 0, RUNCAM_MAX_DEVICE_TYPES);
+    _cam_type.set(constrain_int16(_cam_type, 0, RUNCAM_MAX_DEVICE_TYPES));
     _video_recording = VideoOption(_cam_control_option & uint8_t(ControlOption::VIDEO_RECORDING_AT_BOOT));
 }
 
@@ -142,6 +142,7 @@ void AP_RunCam::init()
           without a runcam
          */
         _cam_type.set_default(int8_t(DeviceType::SplitMicro));
+        AP_Param::invalidate_count();
     }
     if (_cam_type.get() == int8_t(DeviceType::Disabled)) {
         uart = nullptr;
@@ -498,15 +499,17 @@ AP_RunCam::Event AP_RunCam::map_rc_input_to_event() const
     } else if (_osd_option == OSDOption::ENTER
         && _cam_control_option & uint8_t(ControlOption::TWO_POS_SWITCH)) {
         result = Event::ENTER_MENU;
-    } else if (_osd_option == OSDOption::OPTION
+    } else if ((_osd_option == OSDOption::OPTION || _osd_option == OSDOption::ENTER)
         && _cam_control_option & uint8_t(ControlOption::THREE_POS_SWITCH)) {
         result = Event::ENTER_MENU;
     } else if (_osd_option == OSDOption::EXIT
         && _cam_control_option & uint8_t(ControlOption::TWO_POS_SWITCH)) {
         result = Event::EXIT_MENU;
-    } else if (_osd_option == OSDOption::NO_OPTION
+    } else if ((_osd_option == OSDOption::NO_OPTION || _osd_option == OSDOption::EXIT)
         && _cam_control_option & uint8_t(ControlOption::THREE_POS_SWITCH)) {
         result = Event::EXIT_MENU;
+    } else {
+        debug("map_rc_input_to_event(): nothing selected\n");
     }
     return result;
 }
@@ -797,7 +800,7 @@ void AP_RunCam::start_uart()
 void AP_RunCam::get_device_info()
 {
     send_request_and_waiting_response(Command::RCDEVICE_PROTOCOL_COMMAND_GET_DEVICE_INFO, 0, RUNCAM_INIT_INTERVAL_MS * 4,
-        -1, FUNCTOR_BIND_MEMBER(&AP_RunCam::parse_device_info, void, const Request&));
+        UINT16_MAX, FUNCTOR_BIND_MEMBER(&AP_RunCam::parse_device_info, void, const Request&));
 }
 
 // map a Event to a SimulationOperation
@@ -950,7 +953,7 @@ void AP_RunCam::parse_device_info(const Request& request)
     uint8_t featureLowBits = request._recv_buf[2];
     uint8_t featureHighBits = request._recv_buf[3];
     if (!has_feature(Feature::FEATURES_OVERRIDE)) {
-        _features = (featureHighBits << 8) | featureLowBits;
+        _features.set((featureHighBits << 8) | featureLowBits);
     }
     if (_features > 0) {
         _state = State::INITIALIZED;

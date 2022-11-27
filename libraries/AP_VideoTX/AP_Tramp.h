@@ -27,7 +27,6 @@
 #if AP_TRAMP_ENABLED
 
 #include <AP_Param/AP_Param.h>
-#include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_HAL/utility/RingBuffer.h>
 #include "AP_VideoTX.h"
 
@@ -49,8 +48,7 @@ public:
     ~AP_Tramp() {}
 
     /* Do not allow copies */
-    AP_Tramp(const AP_Tramp &other) = delete;
-    AP_Tramp &operator=(const AP_Tramp&) = delete;
+    CLASS_NO_COPY(AP_Tramp);
 
     static AP_Tramp *get_singleton(void) {
         return singleton;

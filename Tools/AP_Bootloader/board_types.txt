@@ -43,6 +43,7 @@ TARGET_HW_ARK_CAN_GPS                  81
 TARGET_HW_ARK_CAN_RTK_GPS              82
 TARGET_HW_FF_RTK_CAN_GPS               85
 TARGET_HW_ATL_MANTIS_EDU               97
+TARGET_HW_ARK_FMU_V6X                  57
 
 
 Reserved  PX4 [BL] FMU v5X.x           51
@@ -142,7 +143,7 @@ AP_HW_ARGOSDYNE_DP1000               1039
 AP_HW_Nucleo491                      1040
 AP_HW_mRoM10095                      1041
 AP_HW_FlywooF745Nano                 1042
-AP_HW_HEREID                         1043
+AP_HW_HERE3PLUS                      1043
 AP_HW_BirdCANdy                      1044
 AP_HW_SKYSTARSF405DJI                1045
 AP_HW_HITEC_AIRSPEED                 1046
@@ -176,8 +177,22 @@ AP_HW_MAMBAH743_V4                   1073
 AP_HW_REAPERF745_V2                  1074
 AP_HW_SKYSTARSH7HD                   1075
 AP_HW_PixSurveyA1                    1076
+AP_HW_AEROFOX_AIRSPEED               1077
+AP_HW_ATOMRCF405                     1078
+AP_HW_CUBEPILOT_CANMOD               1079
+AP_HW_AEROFOX_PMU                    1080
+AP_HW_JHEMCUGF16F405                 1081
+AP_HW_SPEEDYBEEF4V3                  1082
+AP_HW_PixPilot-V6                    1083
+AP_HW_JFB100                         1084
+AP_HW_JUMPER_XIAKE800                1086
 
 AP_HW_CUBEORANGE_PERIPH              1400
 AP_HW_CUBEBLACK_PERIPH               1401
 AP_HW_PIXRACER_PERIPH                1402
 AP_HW_SWBOOMBOARD_PERIPH             1403
+
+# OpenDroneID enabled boards. Use 10000 + the base board ID
+AP_HW_CubeOrange_ODID               10140
+AP_HW_Pixhawk6_ODID                 10053
+

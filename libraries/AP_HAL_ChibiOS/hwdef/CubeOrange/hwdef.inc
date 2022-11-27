@@ -54,7 +54,7 @@ PA7 SPI1_MOSI SPI1
 # a pin that enables peripheral power on this board. It starts in the
 # off state, then is pulled low to enable peripherals in
 # peripheral_power_enable()
-PA8 nVDD_5V_PERIPH_EN OUTPUT HIGH
+PA8 nVDD_5V_PERIPH_EN OUTPUT LOW
 
 # This is the pin that senses USB being connected. It is an input pin
 # setup as OPENDRAIN.
@@ -279,8 +279,8 @@ COMPASS AK8963:probe_mpu9250 1 ROTATION_YAW_270
 COMPASS AK09916:probe_ICM20948 0 ROTATION_ROLL_180_YAW_90
 
 # offset the internal compass for EM impact of the IMU heater
-# this is in sensor frame mGauss
-define HAL_AK09916_HEATER_OFFSET Vector3f(30,10,235)
+# this is in body frame mGauss
+define HAL_HEATER_MAG_OFFSET {AP_HAL::Device::make_bus_id(AP_HAL::Device::BUS_TYPE_SPI,4,1,9),Vector3f(10,30,-235)}
 
 # also probe for external compasses
 define HAL_PROBE_EXTERNAL_I2C_COMPASSES
@@ -330,8 +330,13 @@ ROMFS io_firmware.bin Tools/IO_Firmware/iofirmware_highpolh.bin
 DMA_NOSHARE SPI1* SPI4* USART6*
 
 # for users who have replaced their CubeSolo with a CubeOrange:
-define HAL_OREO_LED_ENABLED 1
+define AP_NOTIFY_OREOLED_ENABLED 1
 define HAL_SOLO_GIMBAL_ENABLED HAL_MOUNT_ENABLED
 
 # Enable Sagetech MXS ADSB transponder
 define HAL_ADSB_SAGETECH_MXS_ENABLED HAL_ADSB_ENABLED
+
+# enable DFU reboot for installing bootloader
+# note that if firmware is build with --secure-bl then DFU is
+# disabled
+ENABLE_DFU_BOOT 1

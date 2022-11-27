@@ -29,7 +29,6 @@
 #include <AP_Math/vectorN.h>
 #include <AP_NavEKF/AP_NavEKF_core_common.h>
 #include <AP_NavEKF/EKF_Buffer.h>
-#include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_DAL/AP_DAL.h>
 
 #include "AP_NavEKF/EKFGSF_yaw.h"
@@ -247,7 +246,7 @@ public:
     void  getFilterStatus(nav_filter_status &status) const;
 
     // send an EKF_STATUS_REPORT message to GCS
-    void send_status_report(mavlink_channel_t chan) const;
+    void send_status_report(class GCS_MAVLINK &link) const;
 
     // provides the height limit to be observed by the control loops
     // returns false if no height limiting is required
@@ -1020,7 +1019,11 @@ private:
     ftype varInnovRngBcn;               // range beacon observation innovation variance (m^2)
     ftype innovRngBcn;                  // range beacon observation innovation (m)
     uint32_t lastTimeRngBcn_ms[10];     // last time we received a range beacon measurement (msec)
+#if AP_BEACON_ENABLED
     bool rngBcnDataToFuse;              // true when there is new range beacon data to fuse
+#else
+    const bool rngBcnDataToFuse = false;              // true when there is new range beacon data to fuse
+#endif
     Vector3F beaconVehiclePosNED;       // NED position estimate from the beacon system (NED)
     ftype beaconVehiclePosErr;          // estimated position error from the beacon system (m)
     uint32_t rngBcnLast3DmeasTime_ms;   // last time the beacon system returned a 3D fix (msec)

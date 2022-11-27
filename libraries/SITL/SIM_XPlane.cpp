@@ -28,7 +28,7 @@
 #include <sys/types.h>
 
 #include <AP_HAL/AP_HAL.h>
-#include <AP_Logger/AP_Logger.h>
+#include <SRV_Channel/SRV_Channel.h>
 
 // ignore cast errors in this case to keep complexity down
 #pragma GCC diagnostic ignored "-Wcast-align"
@@ -47,7 +47,6 @@ XPlane::XPlane(const char *frame_str) :
     }
 
     heli_frame = (strstr(frame_str, "-heli") != nullptr);
-    num_motors = 2;
 
     socket_in.bind("0.0.0.0", bind_port);
     printf("Waiting for XPlane data on UDP port %u and sending to port %u\n",

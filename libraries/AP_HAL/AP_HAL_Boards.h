@@ -184,12 +184,13 @@
 #define BOARD_FLASH_SIZE 2048
 #endif
 
-#ifndef HAL_WITH_DSP
-#if CONFIG_HAL_BOARD == HAL_BOARD_LINUX || defined(HAL_BOOTLOADER_BUILD) || defined(HAL_BUILD_AP_PERIPH) || BOARD_FLASH_SIZE <= 1024
-#define HAL_WITH_DSP 0
-#else
-#define HAL_WITH_DSP !HAL_MINIMIZE_FEATURES
+#ifndef HAL_GYROFFT_ENABLED
+#define HAL_GYROFFT_ENABLED (BOARD_FLASH_SIZE > 1024)
 #endif
+
+// enable AP_GyroFFT library only if required:
+#ifndef HAL_WITH_DSP
+#define HAL_WITH_DSP HAL_GYROFFT_ENABLED
 #endif
 
 #ifndef HAL_OS_FATFS_IO
@@ -213,15 +214,11 @@
 #endif
 
 #ifndef HAL_MAX_CAN_PROTOCOL_DRIVERS
-#if defined(HAL_BOOTLOADER_BUILD)
-    #define HAL_MAX_CAN_PROTOCOL_DRIVERS 0
-#else
     #define HAL_MAX_CAN_PROTOCOL_DRIVERS HAL_NUM_CAN_IFACES
-#endif
 #endif
 
 #ifndef HAL_CANMANAGER_ENABLED
-#define HAL_CANMANAGER_ENABLED ((HAL_MAX_CAN_PROTOCOL_DRIVERS > 0) && !defined(HAL_BUILD_AP_PERIPH))
+#define HAL_CANMANAGER_ENABLED (HAL_MAX_CAN_PROTOCOL_DRIVERS > 0)
 #endif
 
 #ifndef HAL_ENABLE_LIBUAVCAN_DRIVERS
@@ -261,6 +258,10 @@
 #define USE_LIBC_REALLOC 1
 #endif
 
+#ifndef AP_HAL_SHARED_DMA_ENABLED
+#define AP_HAL_SHARED_DMA_ENABLED 1
+#endif
+
 #ifndef HAL_ENABLE_THREAD_STATISTICS
 #define HAL_ENABLE_THREAD_STATISTICS 0
 #endif
@@ -275,6 +276,18 @@
 
 #ifndef HAL_WITH_MCU_MONITORING
 #define HAL_WITH_MCU_MONITORING 0
+#endif
+
+#ifndef AP_CRASHDUMP_ENABLED
+#define AP_CRASHDUMP_ENABLED 0
+#endif
+
+#ifndef AP_SIGNED_FIRMWARE
+#define AP_SIGNED_FIRMWARE 0
+#endif
+
+#ifndef HAL_DSHOT_ALARM_ENABLED
+#define HAL_DSHOT_ALARM_ENABLED 0
 #endif
 
 #ifndef HAL_HNF_MAX_FILTERS
@@ -308,4 +321,16 @@
 
 #ifndef __FASTRAMFUNC__
 #define __FASTRAMFUNC__
+#endif
+
+#ifndef HAL_ENABLE_DFU_BOOT
+#define HAL_ENABLE_DFU_BOOT 0
+#endif
+
+
+// sanity checks for the configuration.  This can't test everything as
+// the libraries can do their own definitions - but we can catch some
+// things:
+#if HAL_MINIMIZE_FEATURES && BOARD_FLASH_SIZE > 1024
+#error "2MB board with minimize features?!"
 #endif

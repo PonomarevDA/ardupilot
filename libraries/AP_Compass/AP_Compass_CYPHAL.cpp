@@ -17,6 +17,8 @@
 
 #include "AP_Compass_CYPHAL.h"
 #include <AP_CANManager/AP_CANManager.h>
+#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 
 extern const AP_HAL::HAL& hal;
 #define LOG_TAG "COMPASS"

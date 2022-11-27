@@ -1,7 +1,6 @@
 #pragma once
 
 #include <AP_Common/AP_Common.h>
-#include <AP_Vehicle/AP_Vehicle.h>
 #include "AP_AutoTune.h"
 #include <AP_Math/AP_Math.h>
 #include <AC_PID/AC_PID.h>
@@ -9,11 +8,10 @@
 class AP_PitchController
 {
 public:
-    AP_PitchController(const AP_Vehicle::FixedWing &parms);
+    AP_PitchController(const AP_FixedWing &parms);
 
     /* Do not allow copies */
-    AP_PitchController(const AP_PitchController &other) = delete;
-    AP_PitchController &operator=(const AP_PitchController&) = delete;
+    CLASS_NO_COPY(AP_PitchController);
 
     float get_rate_out(float desired_rate, float scaler);
     float get_servo_out(int32_t angle_err, float scaler, bool disable_integrator, bool ground_mode);
@@ -44,11 +42,12 @@ public:
     AP_Float &kI(void) { return rate_pid.kI(); }
     AP_Float &kD(void) { return rate_pid.kD(); }
     AP_Float &kFF(void) { return rate_pid.ff(); }
+    AP_Float &tau(void) { return gains.tau; }
 
     void convert_pid();
 
 private:
-    const AP_Vehicle::FixedWing &aparm;
+    const AP_FixedWing &aparm;
     AP_AutoTune::ATGains gains;
     AP_AutoTune *autotune;
     bool failed_autotune_alloc;

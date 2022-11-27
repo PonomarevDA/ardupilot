@@ -1,29 +1,11 @@
 #pragma once
 
-#include <AP_Common/AP_Common.h>
-#include <AP_HAL/AP_HAL_Boards.h>
+#include "AP_Airspeed_config.h"
+
 #include <AP_Param/AP_Param.h>
-#include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_Math/AP_Math.h>
-#include <AP_MSP/msp.h>
-
-#ifndef AP_AIRSPEED_ENABLED
-#define AP_AIRSPEED_ENABLED 1
-#endif
-
-#ifndef AP_AIRSPEED_MSP_ENABLED
-#define AP_AIRSPEED_MSP_ENABLED (AP_AIRSPEED_ENABLED && HAL_MSP_SENSORS_ENABLED)
-#endif
 
 class AP_Airspeed_Backend;
-
-#ifndef AIRSPEED_MAX_SENSORS
-#define AIRSPEED_MAX_SENSORS 2
-#endif
-
-#ifndef AP_AIRSPEED_AUTOCAL_ENABLE
-#define AP_AIRSPEED_AUTOCAL_ENABLE AP_AIRSPEED_ENABLED
-#endif
 
 class Airspeed_Calibration {
 public:
@@ -127,6 +109,10 @@ public:
     uint32_t last_update_ms(uint8_t i) const { return state[i].last_update_ms; }
     uint32_t last_update_ms(void) const { return last_update_ms(primary); }
 
+#if AP_AIRSPEED_HYGROMETER_ENABLE
+    bool get_hygrometer(uint8_t i, uint32_t &last_sample_ms, float &temperature, float &humidity) const;
+#endif
+
     static const struct AP_Param::GroupInfo var_info[];
 
     enum pitot_tube_order { PITOT_TUBE_ORDER_POSITIVE = 0,
@@ -137,6 +123,7 @@ public:
         ON_FAILURE_AHRS_WIND_MAX_DO_DISABLE                   = (1<<0),   // If set then use airspeed failure check
         ON_FAILURE_AHRS_WIND_MAX_RECOVERY_DO_REENABLE         = (1<<1),   // If set then automatically enable the airspeed sensor use when healthy again.
         DISABLE_VOLTAGE_CORRECTION                            = (1<<2),
+        USE_EKF_CONSISTENCY                                   = (1<<3),
     };
 
     enum airspeed_type {
@@ -184,6 +171,7 @@ private:
     AP_Int32 _options;    // bitmask options for airspeed
     AP_Float _wind_max;
     AP_Float _wind_warn;
+    AP_Float _wind_gate;
 
     struct {
         AP_Float offset;
@@ -226,9 +214,14 @@ private:
         struct {
             uint32_t last_check_ms;
             float health_probability;
+            float test_ratio;
             int8_t param_use_backup;
             uint32_t last_warn_ms;
         } failures;
+
+#if AP_AIRSPEED_HYGROMETER_ENABLE
+        uint32_t last_hygrometer_log_ms;
+#endif
     } state[AIRSPEED_MAX_SENSORS];
 
     bool calibration_enabled;
@@ -253,6 +246,14 @@ private:
     }
     float get_health_probability(void) const {
         return get_health_probability(primary);
+    }
+
+    // get the consistency test ratio
+    float get_test_ratio(uint8_t i) const {
+        return state[i].failures.test_ratio;
+    }
+    float get_test_ratio(void) const {
+        return get_test_ratio(primary);
     }
 
     void update_calibration(uint8_t i, float raw_pressure);

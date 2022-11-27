@@ -50,11 +50,14 @@
 #include "AP_Baro_MSP.h"
 #include "AP_Baro_ExternalAHRS.h"
 #include "AP_Baro_ICP101XX.h"
+#include "AP_Baro_ICP201XX.h"
 
 #include <AP_Airspeed/AP_Airspeed.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Arming/AP_Arming.h>
 #include <AP_Logger/AP_Logger.h>
+#include <AP_GPS/AP_GPS.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 
 #define INTERNAL_TEMPERATURE_CLAMP 35.0f
 
@@ -126,8 +129,8 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
 
     // @Param: _EXT_BUS
     // @DisplayName: External baro bus
-    // @Description: This selects the bus number for looking for an I2C barometer. When set to -1 it will probe all external i2c buses based on the GND_PROBE_EXT parameter.
-    // @Values: -1:Disabled,0:Bus0,1:Bus1
+    // @Description: This selects the bus number for looking for an I2C barometer. When set to -1 it will probe all external i2c buses based on the BARO_PROBE_EXT parameter.
+    // @Values: -1:Disabled,0:Bus0,1:Bus1,6:Bus6
     // @User: Advanced
     AP_GROUPINFO("_EXT_BUS", 7, AP_Baro, _ext_bus, HAL_BARO_EXTERNAL_BUS_DEFAULT),
 
@@ -176,7 +179,7 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
 #if defined(HAL_PROBE_EXTERNAL_I2C_BAROS) || defined(AP_BARO_MSP_ENABLED)
     // @Param: _PROBE_EXT
     // @DisplayName: External barometers to probe
-    // @Description: This sets which types of external i2c barometer to look for. It is a bitmask of barometer types. The I2C buses to probe is based on GND_EXT_BUS. If BARO_EXT_BUS is -1 then it will probe all external buses, otherwise it will probe just the bus number given in GND_EXT_BUS.
+    // @Description: This sets which types of external i2c barometer to look for. It is a bitmask of barometer types. The I2C buses to probe is based on BARO_EXT_BUS. If BARO_EXT_BUS is -1 then it will probe all external buses, otherwise it will probe just the bus number given in BARO_EXT_BUS.
     // @Bitmask: 0:BMP085,1:BMP280,2:MS5611,3:MS5607,4:MS5637,5:FBM320,6:DPS280,7:LPS25H,8:Keller,9:MS5837,10:BMP388,11:SPL06,12:MSP
     // @User: Advanced
     AP_GROUPINFO("_PROBE_EXT", 14, AP_Baro, _baro_probe_ext, HAL_BARO_PROBE_EXT_DEFAULT),
@@ -234,6 +237,25 @@ const AP_Param::GroupInfo AP_Baro::var_info[] = {
     AP_GROUPINFO("_FIELD_ELV", 22, AP_Baro, _field_elevation, 0),
 #endif
 #endif
+
+#if APM_BUILD_COPTER_OR_HELI || APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+    // @Param: _ALTERR_MAX
+    // @DisplayName: Altitude error maximum
+    // @Description: This is the maximum acceptable altitude discrepancy between GPS altitude and barometric presssure altitude calculated against a standard atmosphere for arming checks to pass. If you are getting an arming error due to this parameter then you may have a faulty or substituted barometer. A common issue is vendors replacing a MS5611 in a "Pixhawk" with a MS5607. If you have that issue then please see BARO_OPTIONS parameter to force the MS5611 to be treated as a MS5607. This check is disabled if the value is zero.
+    // @Units: m
+    // @Increment: 1
+    // @Range: 0 5000
+    // @User: Advanced
+    AP_GROUPINFO("_ALTERR_MAX", 23, AP_Baro, _alt_error_max, 2000),
+
+    // @Param: _OPTIONS
+    // @DisplayName: Barometer options
+    // @Description: Barometer options
+    // @Bitmask: 0:Treat MS5611 as MS5607
+    // @User: Advanced
+    AP_GROUPINFO("_OPTIONS", 24, AP_Baro, _options, 0),
+#endif
+    
     AP_GROUPEND
 };
 
@@ -535,6 +557,21 @@ bool AP_Baro::_add_backend(AP_Baro_Backend *backend)
 }
 
 /*
+  wrapper around hal.i2c_mgr->get_device() that prevents duplicate devices being opened
+ */
+bool AP_Baro::_have_i2c_driver(uint8_t bus, uint8_t address) const
+{
+    for (int i=0; i<_num_drivers; ++i) {
+        if (AP_HAL::Device::make_bus_id(AP_HAL::Device::BUS_TYPE_I2C, bus, address, 0) ==
+            AP_HAL::Device::change_bus_id(uint32_t(sensors[i].bus_id.get()), 0)) {
+            // device already has been defined.
+            return true;
+        }
+    }
+    return false;
+}
+
+/*
   macro to add a backend with check for too many sensors
  We don't try to start more than the maximum allowed
  */
@@ -596,7 +633,7 @@ void AP_Baro::init(void)
 #endif
 
 // macro for use by HAL_INS_PROBE_LIST
-#define GET_I2C_DEVICE(bus, address) hal.i2c_mgr->get_device(bus, address)
+#define GET_I2C_DEVICE(bus, address) _have_i2c_driver(bus, address)?nullptr:hal.i2c_mgr->get_device(bus, address)
 
 #if AP_SIM_BARO_ENABLED
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL && AP_BARO_MS56XX_ENABLED
@@ -784,7 +821,7 @@ void AP_Baro::_probe_i2c_barometers(void)
         // no internal i2c baros, so this is safe
         mask |= hal.i2c_mgr->get_bus_mask_internal();
     }
-    // if the user has set GND_EXT_BUS then probe the bus given by that parameter
+    // if the user has set BARO_EXT_BUS then probe the bus given by that parameter
     int8_t ext_bus = _ext_bus;
     if (ext_bus >= 0) {
         mask = 1U << (uint8_t)ext_bus;
@@ -892,7 +929,7 @@ void AP_Baro::update(void)
             // update altitude calculation
             float ground_pressure = sensors[i].ground_pressure;
             if (!is_positive(ground_pressure) || isnan(ground_pressure) || isinf(ground_pressure)) {
-                sensors[i].ground_pressure = sensors[i].pressure;
+                sensors[i].ground_pressure.set(sensors[i].pressure);
             }
             float altitude = sensors[i].altitude;
             float corrected_pressure = sensors[i].pressure + sensors[i].p_correction;
@@ -1041,6 +1078,34 @@ void AP_Baro::handle_external(const AP_ExternalAHRS::baro_data_message_t &pkt)
     }
 }
 #endif  // AP_BARO_EXTERNALAHRS_ENABLED
+
+// returns false if we fail arming checks, in which case the buffer will be populated with a failure message
+bool AP_Baro::arming_checks(size_t buflen, char *buffer) const
+{
+    if (!all_healthy()) {
+        hal.util->snprintf(buffer, buflen, "not healthy");
+        return false;
+    }
+
+#if APM_BUILD_COPTER_OR_HELI || APM_BUILD_TYPE(APM_BUILD_ArduPlane)
+    /*
+      check for a pressure altitude discrepancy between GPS alt and
+      baro alt this catches bad barometers, such as when a MS5607 has
+      been substituted for a MS5611
+     */
+    const auto &gps = AP::gps();
+    if (_alt_error_max > 0 && gps.status() >= AP_GPS::GPS_Status::GPS_OK_FIX_3D) {
+        const float alt_amsl = gps.location().alt*0.01;
+        const float alt_pressure = get_altitude_difference(SSL_AIR_PRESSURE, get_pressure());
+        const float error = fabsf(alt_amsl - alt_pressure);
+        if (error > _alt_error_max) {
+            hal.util->snprintf(buffer, buflen, "GPS alt error %.0fm (see BARO_ALTERR_MAX)", error);
+            return false;
+        }
+    }
+#endif
+    return true;
+}
 
 namespace AP {
 

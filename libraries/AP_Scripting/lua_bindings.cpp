@@ -12,24 +12,9 @@
 
 extern const AP_HAL::HAL& hal;
 
-int check_arguments(lua_State *L, int expected_arguments, const char *fn_name);
-int check_arguments(lua_State *L, int expected_arguments, const char *fn_name) {
-#if defined(AP_SCRIPTING_CHECKS) && AP_SCRIPTING_CHECKS >= 1
-    if (expected_arguments < 0) {
-       AP_HAL::panic("Lua: Attempted to check for negative arguments");
-    }
-#endif
-
-    const int args = lua_gettop(L);
-    if (args != expected_arguments) {
-        return luaL_error(L, "%s expected %d arguments got %d", fn_name, expected_arguments, args);
-    }
-    return 0;
-}
-
 // millis
 int lua_millis(lua_State *L) {
-    check_arguments(L, 0, "millis");
+    binding_argcheck(L, 0);
 
     new_uint32_t(L);
     *check_uint32_t(L, -1) = AP_HAL::millis();
@@ -39,7 +24,7 @@ int lua_millis(lua_State *L) {
 
 // micros
 int lua_micros(lua_State *L) {
-    check_arguments(L, 0, "micros");
+    binding_argcheck(L, 0);
 
     new_uint32_t(L);
     *check_uint32_t(L, -1) = AP_HAL::micros();
@@ -48,7 +33,7 @@ int lua_micros(lua_State *L) {
 }
 
 int lua_mission_receive(lua_State *L) {
-    check_arguments(L, 0, "mission_receive");
+    binding_argcheck(L, 0);
 
     ObjectBuffer<struct AP_Scripting::scripting_mission_cmd> *input = AP::scripting()->mission_data;
 
@@ -81,15 +66,18 @@ int AP_Logger_Write(lua_State *L) {
         return luaL_argerror(L, 1, "logger not supported on this firmware");
     }
 
+    // Allow : and . access
+    const int arg_offset = (luaL_testudata(L, 1, "logger") != NULL) ? 1 : 0;
+
     // check we have at least 4 arguments passed in
-    const int args = lua_gettop(L);
+    const int args = lua_gettop(L) - arg_offset;
     if (args < 4) {
         return luaL_argerror(L, args, "too few arguments");
     }
 
-    const char * name = luaL_checkstring(L, 1);
-    const char * labels = luaL_checkstring(L, 2);
-    const char * fmt = luaL_checkstring(L, 3);
+    const char * name = luaL_checkstring(L, 1 + arg_offset);
+    const char * labels = luaL_checkstring(L, 2 + arg_offset);
+    const char * fmt = luaL_checkstring(L, 3 + arg_offset);
 
     // cheack the name, labels and format are not too long
     if (strlen(name) >= LS_NAME_SIZE) {
@@ -142,13 +130,13 @@ int AP_Logger_Write(lua_State *L) {
     struct AP_Logger::log_write_fmt *f;
     if (!have_units) {
         // ask for a mesage type
-        f = AP_logger->msg_fmt_for_name(name, label_cat, nullptr, nullptr, fmt_cat, true);
+        f = AP_logger->msg_fmt_for_name(name, label_cat, nullptr, nullptr, fmt_cat, true, true);
 
     } else {
         // read in units and multiplers strings
         field_start += 2;
-        const char * units = luaL_checkstring(L, 4);
-        const char * multipliers = luaL_checkstring(L, 5);
+        const char * units = luaL_checkstring(L, 4 + arg_offset);
+        const char * multipliers = luaL_checkstring(L, 5 + arg_offset);
 
         if (length != strlen(units)) {
             return luaL_error(L, "units must be same length as format");
@@ -165,7 +153,7 @@ int AP_Logger_Write(lua_State *L) {
         strcat(multipliers_cat,multipliers);
 
         // ask for a mesage type
-        f = AP_logger->msg_fmt_for_name(name, label_cat, units_cat, multipliers_cat, fmt_cat, true);
+        f = AP_logger->msg_fmt_for_name(name, label_cat, units_cat, multipliers_cat, fmt_cat, true, true);
     }
 
     if (f == nullptr) {
@@ -180,21 +168,27 @@ int AP_Logger_Write(lua_State *L) {
         return luaL_argerror(L, args, "unknown format");
     }
 
-    luaL_Buffer buffer;
-    luaL_buffinit(L, &buffer);
+    lua_Alloc allocf = lua_getallocf(L, nullptr);
+    char *buffer = (char*)allocf(nullptr, nullptr, 0, msg_len);
+    if (buffer == nullptr) {
+        return luaL_error(L, "Buffer allocation failed");
+    }
 
     // add logging headers
-    const char header[2] = {(char)HEAD_BYTE1, (char)HEAD_BYTE2};
-    luaL_addlstring(&buffer, header, sizeof(header));
-    luaL_addlstring(&buffer, (char *)&f->msg_type, sizeof(f->msg_type));
+    uint8_t offset = 0;
+    buffer[offset++] = HEAD_BYTE1;
+    buffer[offset++] = HEAD_BYTE2;
+    buffer[offset++] = f->msg_type;
 
     // timestamp is always first value
     const uint64_t now = AP_HAL::micros64();
-    luaL_addlstring(&buffer, (char *)&now, sizeof(uint64_t));
+    memcpy(&buffer[offset], &now, sizeof(uint64_t));
+    offset += sizeof(uint64_t);
 
     for (uint8_t i=field_start; i<=args; i++) {
         uint8_t charlen = 0;
         uint8_t index = have_units ? i-5 : i-3;
+        uint8_t arg_index = i + arg_offset;
         switch(fmt_cat[index]) {
             // logger varable types not available to scripting
             // 'b': int8_t
@@ -209,16 +203,29 @@ int AP_Logger_Write(lua_State *L) {
             case 'i':
             case 'L':
             case 'e': {
-                const lua_Integer tmp1 = luaL_checkinteger(L, i);
-                luaL_argcheck(L, ((tmp1 >= INT32_MIN) && (tmp1 <= INT32_MAX)), i, "argument out of range");
-                int32_t tmp = tmp1;
-                luaL_addlstring(&buffer, (char *)&tmp, sizeof(int32_t));
+                int isnum;
+                const lua_Integer tmp1 = lua_tointegerx(L, arg_index, &isnum);
+                if (!isnum) {
+                    allocf(nullptr, buffer, 0, 0);
+                    luaL_argerror(L, arg_index, "argument out of range");
+                    // no return
+                }
+                const int32_t tmp = tmp1;
+                memcpy(&buffer[offset], &tmp, sizeof(int32_t));
+                offset += sizeof(int32_t);
                 break;
             }
             case 'f': {
-                float tmp = luaL_checknumber(L, i);
-                luaL_argcheck(L, ((tmp >= -INFINITY) && (tmp <= INFINITY)), i, "argument out of range");
-                luaL_addlstring(&buffer, (char *)&tmp, sizeof(float));
+                int isnum;
+                const lua_Number tmp1 = lua_tonumberx(L, arg_index, &isnum);
+                if (!isnum) {
+                    allocf(nullptr, buffer, 0, 0);
+                    luaL_argerror(L, arg_index, "argument out of range");
+                    // no return
+                }
+                const float tmp = tmp1;
+                memcpy(&buffer[offset], &tmp, sizeof(float));
+                offset += sizeof(float);
                 break;
             }
             case 'n': {
@@ -227,16 +234,41 @@ int AP_Logger_Write(lua_State *L) {
             }
             case 'M':
             case 'B': {
-                const lua_Integer tmp1 = luaL_checkinteger(L, i);
-                luaL_argcheck(L, ((tmp1 >= 0) && (tmp1 <= UINT8_MAX)), i, "argument out of range");
+                int isnum;
+                const lua_Integer tmp1 = lua_tointegerx(L, arg_index, &isnum);
+                if (!isnum || (tmp1 < 0) || (tmp1 > UINT8_MAX)) {
+                    allocf(nullptr, buffer, 0, 0);
+                    luaL_argerror(L, arg_index, "argument out of range");
+                    // no return
+                }
                 uint8_t tmp = static_cast<uint8_t>(tmp1);
-                luaL_addlstring(&buffer, (char *)&tmp, sizeof(uint8_t));
+                memcpy(&buffer[offset], &tmp, sizeof(uint8_t));
+                offset += sizeof(uint8_t);
                 break;
             }
             case 'I':
             case 'E': {
-                const uint32_t tmp = coerce_to_uint32_t(L, i);
-                luaL_addlstring(&buffer, (char *)&tmp, sizeof(uint32_t));
+                uint32_t tmp;
+                void * ud = luaL_testudata(L, arg_index, "uint32_t");
+                if (ud != nullptr) {
+                    tmp = *static_cast<uint32_t *>(ud);
+                } else {
+                    int success;
+                    const lua_Integer v_int = lua_tointegerx(L, arg_index, &success);
+                    if (success) {
+                        tmp = v_int;
+                    } else {
+                        const lua_Number v_float = lua_tonumberx(L, arg_index, &success);
+                        if (!success || (v_float < 0) || (v_float > float(UINT32_MAX))) {
+                            allocf(nullptr, buffer, 0, 0);
+                            luaL_argerror(L, arg_index, "argument out of range");
+                            // no return
+                        }
+                        tmp = v_float;
+                    }
+                }
+                memcpy(&buffer[offset], &tmp, sizeof(uint32_t));
+                offset += sizeof(uint32_t);
                 break;
             }
             case 'N': {
@@ -248,35 +280,45 @@ int AP_Logger_Write(lua_State *L) {
                 break;
             }
             default: {
-                return luaL_error(L, "%c unsupported format",fmt_cat[i-3]);
+                allocf(nullptr, buffer, 0, 0);
+                luaL_error(L, "%c unsupported format",fmt_cat[index]);
+                // no return
             }
         }
         if (charlen != 0) {
-            const char *tmp = luaL_checkstring(L, i);
-            const size_t slen = strlen(tmp);
+            size_t slen;
+            const char *tmp = lua_tolstring(L, arg_index, &slen);
+            if (tmp == nullptr) {
+                allocf(nullptr, buffer, 0, 0);
+                luaL_argerror(L, arg_index, "argument out of range");
+                // no return
+            }
             if (slen > charlen) {
-                return luaL_error(L, "arg %i too long for %c format",i,fmt_cat[i-3]);
+                allocf(nullptr, buffer, 0, 0);
+                luaL_error(L, "arg %d too long for %c format",arg_index,fmt_cat[index]);
+                // no return
             }
-            char tstr[charlen];
-            memcpy(tstr, tmp, slen);
-            if (slen < charlen) {
-                memset(&tstr[slen], 0, charlen-slen);
-            }
-            luaL_addlstring(&buffer, tstr, charlen);
+            memcpy(&buffer[offset], tmp, slen);
+            memset(&buffer[offset+slen], 0, charlen-slen);
+            offset += charlen;
         }
     }
 
     AP_logger->Safe_Write_Emit_FMT(f);
 
-    luaL_pushresult(&buffer);
-    AP_logger->WriteBlock(buffer.b,msg_len);
+    AP_logger->WriteBlock(buffer,msg_len);
+
+    allocf(nullptr, buffer, 0, 0);
 
     return 0;
 }
 
 int lua_get_i2c_device(lua_State *L) {
 
-    const int args = lua_gettop(L);
+    // Allow : and . access
+    const int arg_offset = (luaL_testudata(L, 1, "i2c") != NULL) ? 1 : 0;
+
+    const int args = lua_gettop(L) - arg_offset;
     if (args < 2) {
         return luaL_argerror(L, args, "require i2c bus and address");
     }
@@ -284,12 +326,10 @@ int lua_get_i2c_device(lua_State *L) {
         return luaL_argerror(L, args, "too many arguments");
     }
 
-    const lua_Integer bus_in = luaL_checkinteger(L, 1);
-    luaL_argcheck(L, ((bus_in >= 0) && (bus_in <= 4)), 1, "bus out of range");
+    const lua_Integer bus_in = get_integer(L, 1 + arg_offset, 0, 4);
     const uint8_t bus = static_cast<uint8_t>(bus_in);
 
-    const lua_Integer address_in = luaL_checkinteger(L, 2);
-    luaL_argcheck(L, ((address_in >= 0) && (address_in <= 128)), 2, "address out of range");
+    const lua_Integer address_in = get_integer(L, 2 + arg_offset, 0, 128);
     const uint8_t address = static_cast<uint8_t>(address_in);
 
     // optional arguments, use the same defaults as the hal get_device function
@@ -297,10 +337,10 @@ int lua_get_i2c_device(lua_State *L) {
     bool use_smbus = false;
 
     if (args > 2) {
-        bus_clock = coerce_to_uint32_t(L, 3);
+        bus_clock = coerce_to_uint32_t(L, 3 + arg_offset);
 
         if (args > 3) {
-            use_smbus = static_cast<bool>(lua_toboolean(L, 4));
+            use_smbus = static_cast<bool>(lua_toboolean(L, 4 + arg_offset));
         }
     }
 
@@ -328,13 +368,60 @@ int lua_get_i2c_device(lua_State *L) {
     return 1;
 }
 
+int AP_HAL__I2CDevice_read_registers(lua_State *L) {
+    const int args = lua_gettop(L);
+    bool multi_register;
+    if (args == 2) {
+        multi_register = false;
+    } else if (args == 3) {
+        multi_register = true;
+    } else {
+        return luaL_argerror(L, args, "expected 1 or 2 arguments");
+    }
+
+    AP_HAL::I2CDevice * ud = *check_AP_HAL__I2CDevice(L, 1);
+    if (ud == NULL) {
+        return luaL_error(L, "Internal error, null pointer");
+    }
+
+    const uint8_t first_reg = get_uint8_t(L, 2);
+
+    uint8_t recv_length = 1;
+    if (multi_register) {
+        recv_length = get_uint8_t(L, 3);
+    }
+
+    uint8_t data[recv_length];
+
+    ud->get_semaphore()->take_blocking();
+    const bool success = static_cast<bool>(ud->read_registers(first_reg, data, recv_length));
+    ud->get_semaphore()->give();
+
+    if (success) {
+        if (!multi_register) {
+            lua_pushinteger(L, data[0]);
+        } else {
+            // push to table
+            lua_newtable(L);
+            for (uint8_t i=0; i < recv_length; i++) {
+                lua_pushinteger(L, i+1);
+                lua_pushinteger(L, data[i]);
+                lua_settable(L, -3);
+            }
+        }
+    }
+    return success;
+}
+
 #if HAL_MAX_CAN_PROTOCOL_DRIVERS
 int lua_get_CAN_device(lua_State *L) {
 
-    check_arguments(L, 1, "CAN:get_device");
+    // Allow : and . access
+    const int arg_offset = (luaL_testudata(L, 1, "CAN") != NULL) ? 1 : 0;
 
-    const uint32_t raw_buffer_len = coerce_to_uint32_t(L, 1);
-    luaL_argcheck(L, ((raw_buffer_len >= 1U) && (raw_buffer_len <= 25U)), 1, "argument out of range");
+    binding_argcheck(L, 1 + arg_offset);
+
+    const uint32_t raw_buffer_len = get_uint32(L, 1 + arg_offset, 1, 25);
     const uint32_t buffer_len = static_cast<uint32_t>(raw_buffer_len);
 
     if (AP::scripting()->_CAN_dev == nullptr) {
@@ -352,10 +439,12 @@ int lua_get_CAN_device(lua_State *L) {
 
 int lua_get_CAN_device2(lua_State *L) {
 
-    check_arguments(L, 1, "CAN:get_device2");
+    // Allow : and . access
+    const int arg_offset = (luaL_testudata(L, 1, "CAN") != NULL) ? 1 : 0;
 
-    const uint32_t raw_buffer_len = coerce_to_uint32_t(L, 1);
-    luaL_argcheck(L, ((raw_buffer_len >= 1U) && (raw_buffer_len <= 25U)), 1, "argument out of range");
+    binding_argcheck(L, 1 + arg_offset);
+
+    const uint32_t raw_buffer_len = get_uint32(L, 1 + arg_offset, 1, 25);
     const uint32_t buffer_len = static_cast<uint32_t>(raw_buffer_len);
 
     if (AP::scripting()->_CAN_dev2 == nullptr) {

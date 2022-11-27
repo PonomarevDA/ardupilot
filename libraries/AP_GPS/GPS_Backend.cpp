@@ -298,9 +298,12 @@ void AP_GPS_Backend::check_new_itow(uint32_t itow, uint32_t msg_length)
         state.last_corrected_gps_time_us = local_us;
         state.corrected_timestamp_updated = true;
 
+#ifndef HAL_BUILD_AP_PERIPH
         // look for lagged data from the GPS. This is meant to detect
         // the case that the GPS is trying to push more data into the
         // UART than can fit (eg. with GPS_RAW_DATA at 115200).
+        // This is disabled on AP_Periph as it is better to catch missed packet rate at the flight
+        // controller level
         float expected_lag;
         if (gps.get_lag(state.instance, expected_lag)) {
             float lag_s = (now - (state.last_corrected_gps_time_us/1000U)) * 0.001;
@@ -311,6 +314,8 @@ void AP_GPS_Backend::check_new_itow(uint32_t itow, uint32_t msg_length)
                 state.lagged_sample_count = 0;
             }
         }
+#endif // HAL_BUILD_AP_PERIPH
+
         if (state.status >= AP_GPS::GPS_OK_FIX_2D) {
             // we must have a decent fix to calculate difference between itow and pseudo-itow
             _pseudo_itow_delta_ms = itow - (_pseudo_itow/1000ULL);
@@ -418,34 +423,73 @@ bad_yaw:
 
 #if AP_GPS_DEBUG_LOGGING_ENABLED
 
-// log some data for debugging
+/*
+  log some data for debugging
+
+  the logging format matches that used by SITL with SIM_GPS_TYPE=7,
+  allowing for development of GPS drivers based on logged data
+*/
 void AP_GPS_Backend::log_data(const uint8_t *data, uint16_t length)
 {
-    logging.buf.write(data, length);
-    if (!logging.io_registered) {
-        logging.io_registered = true;
-        hal.scheduler->register_io_process(FUNCTOR_BIND_MEMBER(&AP_GPS_Backend::logging_update, void));
+    if (state.instance < 2) {
+        logging[state.instance].buf.write(data, length);
+    }
+    if (!log_thread_created) {
+        log_thread_created = true;
+        hal.scheduler->thread_create(FUNCTOR_BIND_MEMBER(&AP_GPS_Backend::logging_start, void), "gps_log", 4096, AP_HAL::Scheduler::PRIORITY_IO, 0);
     }
 }
 
-// IO thread update, writing to log file
-void AP_GPS_Backend::logging_update(void)
+AP_GPS_Backend::loginfo AP_GPS_Backend::logging[2];
+bool AP_GPS_Backend::log_thread_created;
+
+// logging loop, needs to be static to allow for re-alloc of GPS backends
+void AP_GPS_Backend::logging_loop(void)
 {
-    if (logging.fd == -1) {
-        char fname[] = "gpsN.log";
-        fname[3] = '1' + state.instance;
-        logging.fd = AP::FS().open(fname, O_WRONLY|O_CREAT|O_APPEND);
-    }
-    if (logging.fd != -1) {
-        uint32_t n = 0;
-        const uint8_t *p = logging.buf.readptr(n);
-        if (p != nullptr && n != 0) {
-            int32_t written = AP::FS().write(logging.fd, p, n);
-            if (written > 0) {
-                logging.buf.advance(written);
-                AP::FS().fsync(logging.fd);
+    while (true) {
+        hal.scheduler->delay(10);
+        static uint16_t lognum;
+        for (uint8_t instance=0; instance<2; instance++) {
+            if (logging[instance].fd == -1) {
+                char fname[] = "gpsN_XXX.log";
+                fname[3] = '1' + instance;
+                if (lognum == 0) {
+                    for (lognum=1; lognum<1000; lognum++) {
+                        struct stat st;
+                        hal.util->snprintf(&fname[5], 8, "%03u.log", lognum);
+                        if (AP::FS().stat(fname, &st) != 0) {
+                            break;
+                        }
+                    }
+                }
+                hal.util->snprintf(&fname[5], 8, "%03u.log", lognum);
+                logging[instance].fd = AP::FS().open(fname, O_WRONLY|O_CREAT|O_APPEND);
+            }
+            if (logging[instance].fd != -1) {
+                uint32_t n = 0;
+                const uint8_t *p;
+                while ((p = logging[instance].buf.readptr(n)) != nullptr && n != 0) {
+                    struct {
+                        uint32_t magic = 0x7fe53b04U;
+                        uint32_t time_ms;
+                        uint32_t n;
+                    } header;
+                    header.n = n;
+                    header.time_ms = AP_HAL::millis();
+                    // short writes are unlikely and are ignored (only FS full errors)
+                    AP::FS().write(logging[instance].fd, (const uint8_t *)&header, sizeof(header));
+                    AP::FS().write(logging[instance].fd, p, n);
+                    logging[instance].buf.advance(n);
+                    AP::FS().fsync(logging[instance].fd);
+                }
             }
         }
     }
+}
+
+// logging thread start, needs to be non-static for thread_create
+void AP_GPS_Backend::logging_start(void)
+{
+    logging_loop();
 }
 #endif // AP_GPS_DEBUG_LOGGING_ENABLED

@@ -136,9 +136,11 @@ bool NavEKF3_core::setup_core(uint8_t _imu_index, uint8_t _core_index)
         return false;
     }
     // Note: range beacon data is read one beacon at a time and can arrive at a high rate
+#if EK3_FEATURE_BEACON_FUSION
     if(dal.beacon() && !storedRangeBeacon.init(imu_buffer_length+1)) {
         return false;
     }
+#endif
 #if EK3_FEATURE_EXTERNAL_NAV
     if (frontend->sources.ext_nav_enabled() && !storedExtNav.init(extnav_buffer_length)) {
         return false;
@@ -237,6 +239,7 @@ void NavEKF3_core::InitialiseVariables()
     dt = 0;
     velDotNEDfilt.zero();
     lastKnownPositionNE.zero();
+    lastKnownPositionD = 0;
     prevTnb.zero();
     memset(&P[0][0], 0, sizeof(P));
     memset(&KH[0][0], 0, sizeof(KH));
@@ -294,9 +297,12 @@ void NavEKF3_core::InitialiseVariables()
     sAccFilterState1 = 0.0f;
     sAccFilterState2 = 0.0f;
     lastGpsCheckTime_ms = 0;
-    lastInnovPassTime_ms = 0;
-    lastInnovFailTime_ms = 0;
+    lastGpsInnovPassTime_ms = 0;
+    lastGpsInnovFailTime_ms = 0;
+    lastGpsVertAccPassTime_ms = 0;
+    lastGpsVertAccFailTime_ms = 0;
     gpsAccuracyGood = false;
+    gpsAccuracyGoodForAltitude = false;
     gpsloc_prev = {};
     gpsDriftNE = 0.0f;
     gpsVertVelFilt = 0.0f;
@@ -337,6 +343,7 @@ void NavEKF3_core::InitialiseVariables()
     ZERO_FARRAY(velPosObs);
 
     // range beacon fusion variables
+#if EK3_FEATURE_BEACON_FUSION
     memset((void *)&rngBcnDataDelayed, 0, sizeof(rngBcnDataDelayed));
     lastRngBcnPassTime_ms = 0;
     rngBcnTestRatio = 0.0f;
@@ -375,6 +382,7 @@ void NavEKF3_core::InitialiseVariables()
     }
     bcnPosOffsetNED.zero();
     bcnOriginEstInit = false;
+#endif  // EK3_FEATURE_BEACON_FUSION
 
 #if EK3_FEATURE_BODY_ODOM
     // body frame displacement fusion
@@ -415,7 +423,9 @@ void NavEKF3_core::InitialiseVariables()
     storedTAS.reset();
     storedRange.reset();
     storedOutput.reset();
+#if EK3_FEATURE_BEACON_FUSION
     storedRangeBeacon.reset();
+#endif
 #if EK3_FEATURE_BODY_ODOM
     storedBodyOdm.reset();
     storedWheelOdm.reset();
@@ -682,8 +692,10 @@ void NavEKF3_core::UpdateFilter(bool predict)
         // Muat be run after SelectVelPosFusion() so that fresh GPS data is available
         runYawEstimatorCorrection();
 
+#if EK3_FEATURE_BEACON_FUSION
         // Update states using range beacon data
         SelectRngBcnFusion();
+#endif
 
         // Update states using optical flow data
         SelectFlowFusion();
@@ -808,10 +820,12 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
     // limit states to protect against divergence
     ConstrainStates();
 
+#if EK3_FEATURE_BEACON_FUSION
     // If main filter velocity states are valid, update the range beacon receiver position states
     if (filterStatus.flags.horiz_vel) {
         receiverPos += (stateStruct.velocity + lastVelocity) * (imuDataDelayed.delVelDT*0.5f);
     }
+#endif
 }
 
 /*
@@ -1105,6 +1119,10 @@ void NavEKF3_core::CovariancePrediction(Vector3F *rotVarVecPtr)
 
     if (!inhibitWindStates) {
         ftype windVelVar  = sq(dt * constrain_ftype(frontend->_windVelProcessNoise, 0.0f, 1.0f) * (1.0f + constrain_ftype(frontend->_wndVarHgtRateScale, 0.0f, 1.0f) * fabsF(hgtRate)));
+        if (!tasDataDelayed.allowFusion) {
+            // Allow wind states to recover faster when using sideslip fusion with a failed airspeed sesnor
+            windVelVar *= 10.0f;
+        }
         for (uint8_t i=12; i<=13; i++) processNoiseVariance[i] = windVelVar;
     }
 

@@ -10,6 +10,7 @@
 
 #include <SITL/SIM_Multicopter.h>
 #include <SITL/SIM_Plane.h>
+#include <AP_Vehicle/AP_Vehicle_Type.h>
 
 #include <AP_Baro/AP_Baro.h>
 
@@ -115,6 +116,9 @@ void SIMState::fdm_input_local(void)
     }
     if (benewake_tfmini != nullptr) {
         benewake_tfmini->update(sitl_model->rangefinder_range());
+    }
+    if (teraranger_serial != nullptr) {
+        teraranger_serial->update(sitl_model->rangefinder_range());
     }
     if (lightwareserial != nullptr) {
         lightwareserial->update(sitl_model->rangefinder_range());

@@ -75,7 +75,7 @@ void Plane::init_rc_in()
 
 /*
   initialise RC output for main channels. This is done early to allow
-  for BRD_SAFETYENABLE=0 and early servo control
+  for BRD_SAFETY_DEFLT=0 and early servo control
  */
 void Plane::init_rc_out_main()
 {
@@ -178,7 +178,7 @@ void Plane::read_radio()
 
     control_failsafe();
 
-#if AC_FENCE == ENABLED
+#if AP_FENCE_ENABLED
     const bool stickmixing = fence_stickmixing();
 #else
     const bool stickmixing = true;

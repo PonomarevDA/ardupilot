@@ -82,7 +82,6 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_Proximity,        &rover.g2.proximity,     update,         50,  200,  27),
 #endif
     SCHED_TASK_CLASS(AP_WindVane,         &rover.g2.windvane,      update,         20,  100,  30),
-    SCHED_TASK_CLASS(AC_Fence,            &rover.g2.fence,         update,         10,  100,  33),
     SCHED_TASK(update_wheel_encoder,   50,    200,  36),
     SCHED_TASK(update_compass,         10,    200,  39),
     SCHED_TASK(update_logging1,        10,    200,  45),
@@ -93,14 +92,19 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
     SCHED_TASK_CLASS(RC_Channels,         (RC_Channels*)&rover.g2.rc_channels, read_aux_all,           10,    200,  60),
     SCHED_TASK_CLASS(AP_BattMonitor,      &rover.battery,          read,           10,  300,  63),
     SCHED_TASK_CLASS(AP_ServoRelayEvents, &rover.ServoRelayEvents, update_events,  50,  200,  66),
-#if GRIPPER_ENABLED == ENABLED
+#if AP_GRIPPER_ENABLED
     SCHED_TASK_CLASS(AP_Gripper,          &rover.g2.gripper,       update,         10,   75,  69),
+#if PRECISION_LANDING == ENABLED
+    SCHED_TASK(update_precland,      400,     50,  70),
 #endif
+#endif
+#if AP_RPM_ENABLED
     SCHED_TASK_CLASS(AP_RPM,              &rover.rpm_sensor,       update,         10,  100,  72),
+#endif
 #if HAL_MOUNT_ENABLED
     SCHED_TASK_CLASS(AP_Mount,            &rover.camera_mount,     update,         50,  200,  75),
 #endif
-#if CAMERA == ENABLED
+#if AP_CAMERA_ENABLED
     SCHED_TASK_CLASS(AP_Camera,           &rover.camera,           update,         50,  200,  78),
 #endif
     SCHED_TASK(gcs_failsafe_check,     10,    200,  81),
@@ -112,7 +116,6 @@ const AP_Scheduler::Task Rover::scheduler_tasks[] = {
 #if HAL_SPRAYER_ENABLED
     SCHED_TASK_CLASS(AC_Sprayer,          &rover.g2.sprayer,       update,          3,  90,  99),
 #endif
-    SCHED_TASK_CLASS(Compass,             &rover.compass,          cal_update,     50, 200, 102),
     SCHED_TASK(compass_save,            0.1,  200, 105),
 #if LOGGING_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Logger,           &rover.logger,           periodic_tasks, 50,  300, 108),
@@ -259,13 +262,13 @@ bool Rover::nav_scripting_enable(uint8_t mode)
 }
 
 // lua scripts use this to retrieve the contents of the active command
-bool Rover::nav_script_time(uint16_t &id, uint8_t &cmd, float &arg1, float &arg2)
+bool Rover::nav_script_time(uint16_t &id, uint8_t &cmd, float &arg1, float &arg2, int16_t &arg3, int16_t &arg4)
 {
     if (control_mode != &mode_auto) {
         return false;
     }
 
-    return mode_auto.nav_script_time(id, cmd, arg1, arg2);
+    return mode_auto.nav_script_time(id, cmd, arg1, arg2, arg3, arg4);
 }
 
 // lua scripts use this to indicate when they have complete the command
@@ -404,6 +407,9 @@ void Rover::update_logging2(void)
 
     if (should_log(MASK_LOG_IMU)) {
         AP::ins().Write_Vibration();
+#if HAL_GYROFFT_ENABLED
+        gyro_fft.write_log_messages();
+#endif
     }
 }
 

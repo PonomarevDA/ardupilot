@@ -59,6 +59,9 @@ public:
         k_param_efi,
         k_param_efi_port,
         k_param_efi_baudrate,
+        k_param_esc_telem_rate,
+        k_param_can_slcan_cport,
+        k_param_temperature_sensor,
     };
 
     AP_Int16 format_version;
@@ -67,6 +70,10 @@ public:
     AP_Int32 can_baudrate[HAL_NUM_CAN_IFACES];
 #if HAL_NUM_CAN_IFACES >= 2
     AP_Enum<AP_CANManager::Driver_Type> can_protocol[HAL_NUM_CAN_IFACES];
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_SLCAN
+    AP_Int8 can_slcan_cport;
 #endif
 
 #ifdef HAL_PERIPH_ENABLE_BUZZER_WITHOUT_NOTIFY
@@ -117,6 +124,9 @@ public:
     AP_Int8 esc_pwm_type;
 #if HAL_WITH_ESC_TELEM && !HAL_GCS_ENABLED
     AP_Int8 esc_telem_port;
+#endif
+#if HAL_WITH_ESC_TELEM
+    AP_Int32 esc_telem_rate;
 #endif
 #endif
 

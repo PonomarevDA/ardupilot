@@ -99,6 +99,11 @@ uint16_t AP_Param::num_read_only = 0;
 ObjectBuffer_TS<AP_Param::param_save> AP_Param::save_queue{30};
 bool AP_Param::registered_save_handler;
 
+AP_Param::defaults_list *AP_Param::default_list;
+#if AP_PARAM_MAX_EMBEDDED_PARAM > 0
+    AP_Param::defaults_list *AP_Param::embedded_default_list;
+#endif
+
 // we need a dummy object for the parameter save callback
 static AP_Param save_dummy;
 
@@ -1456,6 +1461,11 @@ void AP_Param::setup_object_defaults(const void *object_pointer, const struct Gr
             void *ptr = (void *)(base + group_info[i].offset);
             set_value((enum ap_var_type)type, ptr,
                       get_default_value((const AP_Param *)ptr, &group_info[i].def_value));
+        } else if (type == AP_PARAM_VECTOR3F) {
+            // Single default for all components
+            void *ptr = (void *)(base + group_info[i].offset);
+            const float default_val = get_default_value((const AP_Param *)ptr, &group_info[i].def_value);
+            ((AP_Vector3f *)ptr)->set(Vector3f{default_val, default_val, default_val});
         }
     }
 }
@@ -1631,7 +1641,7 @@ void AP_Param::load_object_from_eeprom(const void *object_pointer, const struct 
 
 
 // return the first variable in _var_info
-AP_Param *AP_Param::first(ParamToken *token, enum ap_var_type *ptype)
+AP_Param *AP_Param::first(ParamToken *token, enum ap_var_type *ptype, float *default_val)
 {
     token->key = 0;
     token->group_element = 0;
@@ -1639,14 +1649,20 @@ AP_Param *AP_Param::first(ParamToken *token, enum ap_var_type *ptype)
     if (_num_vars == 0) {
         return nullptr;
     }
-    if (ptype != nullptr) {
-        *ptype = (enum ap_var_type)var_info(0).type;
-    }
     ptrdiff_t base;
     if (!get_base(var_info(0), base)) {
         // should be impossible, first var needs to be non-pointer
         return nullptr;
     }
+    if (ptype != nullptr) {
+        *ptype = (enum ap_var_type)var_info(0).type;
+    }
+#if AP_PARAM_DEFAULTS_ENABLED
+    if (default_val != nullptr) {
+        *default_val = var_info(0).def_value;
+    }
+    check_default((AP_Param *)base, default_val);
+#endif
     return (AP_Param *)base;
 }
 
@@ -1659,7 +1675,8 @@ AP_Param *AP_Param::next_group(const uint16_t vindex, const struct GroupInfo *gr
                                const ptrdiff_t group_offset,
                                ParamToken *token,
                                enum ap_var_type *ptype,
-                               bool skip_disabled)
+                               bool skip_disabled,
+                               float *default_val)
 {
     enum ap_var_type type;
     for (uint8_t i=0;
@@ -1682,7 +1699,7 @@ AP_Param *AP_Param::next_group(const uint16_t vindex, const struct GroupInfo *gr
             }
 
             ap = next_group(vindex, ginfo, found_current, group_id(group_info, group_base, i, group_shift),
-                            group_shift + _group_level_shift, new_offset, token, ptype, skip_disabled);
+                            group_shift + _group_level_shift, new_offset, token, ptype, skip_disabled, default_val);
             if (ap != nullptr) {
                 return ap;
             }
@@ -1709,6 +1726,11 @@ AP_Param *AP_Param::next_group(const uint16_t vindex, const struct GroupInfo *gr
                     ((AP_Int8 *)ret)->get() == 0) {
                     token->last_disabled = 1;
                 }
+#if AP_PARAM_DEFAULTS_ENABLED
+                if (default_val != nullptr) {
+                    *default_val = group_info[i].def_value;
+                }
+#endif
                 return ret;
             }
             if (group_id(group_info, group_base, i, group_shift) == token->group_element) {
@@ -1728,6 +1750,11 @@ AP_Param *AP_Param::next_group(const uint16_t vindex, const struct GroupInfo *gr
                     if (!get_base(var_info(vindex), base)) {
                         continue;
                     }
+#if AP_PARAM_DEFAULTS_ENABLED
+                    if (default_val != nullptr) {
+                        *default_val = group_info[i].def_value;
+                    }
+#endif
                     ptrdiff_t ofs = base + group_info[i].offset + group_offset;
                     ofs += sizeof(float)*(token->idx - 1u);
                     return (AP_Param *)ofs;
@@ -1740,7 +1767,7 @@ AP_Param *AP_Param::next_group(const uint16_t vindex, const struct GroupInfo *gr
 
 /// Returns the next variable in _var_info, recursing into groups
 /// as needed
-AP_Param *AP_Param::next(ParamToken *token, enum ap_var_type *ptype, bool skip_disabled)
+AP_Param *AP_Param::next(ParamToken *token, enum ap_var_type *ptype, bool skip_disabled, float *default_val)
 {
     uint16_t i = token->key;
     bool found_current = false;
@@ -1757,6 +1784,11 @@ AP_Param *AP_Param::next(ParamToken *token, enum ap_var_type *ptype, bool skip_d
         if (ptype != nullptr) {
             *ptype = AP_PARAM_FLOAT;
         }
+#if AP_PARAM_DEFAULTS_ENABLED
+        if (default_val != nullptr) {
+            *default_val = var_info(i).def_value;
+        }
+#endif
         return (AP_Param *)(((token->idx - 1u)*sizeof(float))+(ptrdiff_t)var_info(i).ptr);
     }
 
@@ -1775,7 +1807,7 @@ AP_Param *AP_Param::next(ParamToken *token, enum ap_var_type *ptype, bool skip_d
             if (group_info == nullptr) {
                 continue;
             }
-            AP_Param *ap = next_group(i, group_info, &found_current, 0, 0, 0, token, ptype, skip_disabled);
+            AP_Param *ap = next_group(i, group_info, &found_current, 0, 0, 0, token, ptype, skip_disabled, default_val);
             if (ap != nullptr) {
                 return ap;
             }
@@ -1787,6 +1819,11 @@ AP_Param *AP_Param::next(ParamToken *token, enum ap_var_type *ptype, bool skip_d
             if (ptype != nullptr) {
                 *ptype = type;
             }
+#if AP_PARAM_DEFAULTS_ENABLED
+            if (default_val != nullptr) {
+                *default_val = info.def_value;
+            }
+#endif
             return (AP_Param *)(info.ptr);
         }
     }
@@ -1795,17 +1832,20 @@ AP_Param *AP_Param::next(ParamToken *token, enum ap_var_type *ptype, bool skip_d
 
 /// Returns the next scalar in _var_info, recursing into groups
 /// as needed
-AP_Param *AP_Param::next_scalar(ParamToken *token, enum ap_var_type *ptype)
+AP_Param *AP_Param::next_scalar(ParamToken *token, enum ap_var_type *ptype, float *default_val)
 {
     AP_Param *ap;
     enum ap_var_type type;
-    while ((ap = next(token, &type, true)) != nullptr && type > AP_PARAM_FLOAT) ;
+    while ((ap = next(token, &type, true, default_val)) != nullptr && type > AP_PARAM_FLOAT) ;
 
     if (ap != nullptr) {
         if (ptype != nullptr) {
             *ptype = type;
         }
     }
+#if AP_PARAM_DEFAULTS_ENABLED
+    check_default(ap, default_val);
+#endif
     return ap;
 }
 
@@ -2109,7 +2149,7 @@ bool AP_Param::parse_param_line(char *line, char **vname, float &value, bool &re
 }
 
 
-#if HAL_OS_POSIX_IO == 1
+#if HAVE_FILESYSTEM_SUPPORT
 
 // increments num_defaults for each default found in filename
 bool AP_Param::count_defaults_in_file(const char *filename, uint16_t &num_defaults)
@@ -2250,7 +2290,7 @@ bool AP_Param::load_defaults_file(const char *filename, bool last_pass)
     return true;
 }
 
-#endif // HAL_OS_POSIX_IO
+#endif // HAVE_FILESYSTEM_SUPPORT
 
 #if AP_PARAM_MAX_EMBEDDED_PARAM > 0
 /*
@@ -2259,28 +2299,25 @@ bool AP_Param::load_defaults_file(const char *filename, bool last_pass)
 bool AP_Param::count_embedded_param_defaults(uint16_t &count)
 {
     const volatile char *ptr = param_defaults_data.data;
-    uint16_t length = param_defaults_data.length;
+    int32_t length = param_defaults_data.length;
     count = 0;
     
-    while (length) {
+    while (length>0) {
         char line[100];
         char *pname;
         float value;
         bool read_only;
         uint16_t i;
-        uint16_t n = MIN(length, sizeof(line)-1);
+        uint16_t n = length;
         for (i=0;i<n;i++) {
             if (ptr[i] == '\n') {
                 break;
             }
         }
-        if (i == n) {
-            // no newline
-            break;
-        }
-        
-        memcpy(line, (void *)ptr, i);
-        line[i] = 0;
+
+        uint16_t linelen = MIN(i,sizeof(line)-1);
+        memcpy(line, (void *)ptr, linelen);
+        line[linelen] = 0;
 
         length -= i+1;
         ptr += i+1;
@@ -2327,28 +2364,26 @@ void AP_Param::load_embedded_param_defaults(bool last_pass)
     }
 
     const volatile char *ptr = param_defaults_data.data;
-    uint16_t length = param_defaults_data.length;
+    int32_t length = param_defaults_data.length;
     uint16_t idx = 0;
     
-    while (idx < num_defaults && length) {
+    while (idx < num_defaults && length > 0) {
         char line[100];
         char *pname;
         float value;
         bool read_only;
         uint16_t i;
-        uint16_t n = MIN(length, sizeof(line)-1);
+        uint16_t n = length;
         for (i=0;i<n;i++) {
             if (ptr[i] == '\n') {
                 break;
             }
         }
-        if (i == n) {
-            // no newline
-            break;
-        }
-        memcpy(line, (void*)ptr, i);
-        line[i] = 0;
-        
+
+        uint16_t linelen = MIN(i,sizeof(line)-1);
+        memcpy(line, (void *)ptr, linelen);
+        line[linelen] = 0;
+
         length -= i+1;
         ptr += i+1;
 
@@ -2380,6 +2415,9 @@ void AP_Param::load_embedded_param_defaults(bool last_pass)
             num_read_only++;
         }
         idx++;
+#if AP_PARAM_DEFAULTS_ENABLED
+        add_default(vp, value, embedded_default_list);
+#endif
         if (!vp->configured_in_storage()) {
             vp->set_float(value, var_type);
         }
@@ -2651,6 +2689,59 @@ bool AP_Param::set_and_save_by_name_ifchanged(const char *name, float value)
     return false;
 }
 
+#if AP_PARAM_DEFAULTS_ENABLED
+void AP_Param::check_default(AP_Param *ap, float *default_value)
+{
+    if (default_value == nullptr || ap == nullptr) {
+        return;
+    }
+#if AP_PARAM_MAX_EMBEDDED_PARAM > 0
+    // Check embedded list first
+    if (embedded_default_list != nullptr) {
+        for (defaults_list *item = embedded_default_list; item; item = item->next) {
+            if (item->ap == ap) {
+                *default_value = item->val;
+                return;
+            }
+        }
+    }
+#endif
+    if (default_list != nullptr) {
+        for (defaults_list *item = default_list; item; item = item->next) {
+            if (item->ap == ap) {
+                *default_value = item->val;
+                return;
+            }
+        }
+    }
+}
+
+void AP_Param::add_default(AP_Param *ap, float v, defaults_list*& list)
+{
+    if (list != nullptr) {
+        // check is param is already in list
+        for (defaults_list *item = list; item; item = item->next) {
+            // update existing entry
+            if (item->ap == ap) {
+                item->val = v;
+                return;
+            }
+        }
+    }
+
+    // add to list
+    defaults_list *new_item = new defaults_list;
+    if (new_item == nullptr) {
+        return;
+    }
+    new_item->ap = ap;
+    new_item->val = v;
+    new_item->next = list;
+    list = new_item;
+}
+#endif // AP_PARAM_DEFAULTS_ENABLED
+
+
 #if AP_PARAM_KEY_DUMP
 /*
   do not remove this show_all() code, it is essential for debugging
@@ -2695,12 +2786,14 @@ void AP_Param::show_all(AP_HAL::BetterStream *port, bool showKeyValues)
     ParamToken token;
     AP_Param *ap;
     enum ap_var_type type;
+    float default_value = nanf("0x4152");  // from logger quiet_nanf
 
-    for (ap=AP_Param::first(&token, &type);
+    for (ap=AP_Param::first(&token, &type, &default_value);
          ap;
-         ap=AP_Param::next_scalar(&token, &type)) {
+         ap=AP_Param::next_scalar(&token, &type, &default_value)) {
         if (showKeyValues) {
-            ::printf("Key %u: Index %u: GroupElement %u  :  ", (unsigned)var_info(token.key).key, (unsigned)token.idx, (unsigned)token.group_element);
+            ::printf("Key %u: Index %u: GroupElement %u : Default %f  :", (unsigned)var_info(token.key).key, (unsigned)token.idx, (unsigned)token.group_element, default_value);
+            default_value = nanf("0x4152");
         }
         show(ap, token, type, port);
         hal.scheduler->delay(1);
@@ -2926,6 +3019,18 @@ bool AP_Param::add_param(uint8_t _key, uint8_t param_num, const char *pname, flo
     if (load_int32(key, 0, current_crc) && current_crc != crc) {
         // crc mismatch, we have a conflict with an existing use of this key
         return false;
+    }
+
+    // fill in idx of any gaps, leaving them hidden, this allows
+    // scripts to remove parameters
+    for (uint8_t j=1; j<param_num; j++) {
+        auto &g = const_cast<GroupInfo*>(info.group_info)[j];
+        if (g.idx == 0xff) {
+            g.idx = j;
+            g.flags = AP_PARAM_FLAG_HIDDEN;
+            g.offset = j*sizeof(float);
+            g.type = AP_PARAM_FLOAT;
+        }
     }
 
     auto &ginfo = const_cast<GroupInfo*>(info.group_info)[param_num];

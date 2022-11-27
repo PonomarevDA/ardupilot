@@ -174,6 +174,9 @@ const AP_Param::GroupInfo SIM::var_info2[] = {
     // motor harmonics
     AP_GROUPINFO("VIB_MOT_HMNC", 60, SIM,  vibe_motor_harmonics, 1),
 
+    // motor mask, allowing external simulators to mark motors
+    AP_GROUPINFO("VIB_MOT_MASK", 5, SIM,  vibe_motor_mask, 0),
+    
     // max motor vibration frequency
     AP_GROUPINFO("VIB_MOT_MAX", 61, SIM,  vibe_motor, 0.0f),
     // minimum throttle for simulated ins noise
@@ -284,6 +287,8 @@ const AP_Param::GroupInfo SIM::var_info3[] = {
     // @User: Advanced
 
     AP_GROUPINFO("ESC_TELEM", 40, SIM, esc_telem, 1),
+
+    AP_GROUPINFO("ESC_ARM_RPM", 41, SIM,  esc_rpm_armed, 0.0f),
 
     AP_SUBGROUPINFO(airspeed[0], "ARSPD_", 50, SIM, SIM::AirspeedParm),
 #if AIRSPEED_MAX_SENSORS > 1
@@ -661,7 +666,7 @@ Vector3f SIM::convert_earth_frame(const Matrix3f &dcm, const Vector3f &gyro)
 
 // get the rangefinder reading for the desired rotation, returns -1 for no data
 float SIM::get_rangefinder(uint8_t instance) {
-    if (instance < RANGEFINDER_MAX_INSTANCES) {
+    if (instance < ARRAY_SIZE(state.rangefinder_m)) {
         return state.rangefinder_m[instance];
     }
     return -1;

@@ -2,6 +2,10 @@
 /// @brief	Photo or video camera manager, with EEPROM-backed storage of constants.
 #pragma once
 
+#include "AP_Camera_config.h"
+
+#if AP_CAMERA_ENABLED
+
 #include <AP_Common/Location.h>
 #include <AP_Logger/LogStructure.h>
 #include <AP_Param/AP_Param.h>
@@ -27,8 +31,7 @@ public:
     }
 
     /* Do not allow copies */
-    AP_Camera(const AP_Camera &other) = delete;
-    AP_Camera &operator=(const AP_Camera&) = delete;
+    CLASS_NO_COPY(AP_Camera);
 
     // get singleton instance
     static AP_Camera *get_singleton()
@@ -57,6 +60,21 @@ public:
 
     void take_picture();
 
+    // start/stop recording video
+    // start_recording should be true to start recording, false to stop recording
+    bool record_video(bool start_recording);
+
+    // zoom in, out or hold
+    // zoom out = -1, hold = 0, zoom in = 1
+    bool set_zoom_step(int8_t zoom_step);
+
+    // focus in, out or hold
+    // focus in = -1, focus hold = 0, focus out = 1
+    bool set_manual_focus_step(int8_t focus_step);
+
+    // auto focus
+    bool set_auto_focus();
+
     // Update - to be called periodically @at least 50Hz
     void update();
 
@@ -77,6 +95,7 @@ public:
         servo   = 0,
         relay   = 1,
         gopro   = 2,
+        mount   = 3,
     };
 
     AP_Camera::CamTrigType get_trigger_type(void);
@@ -162,3 +181,5 @@ private:
 namespace AP {
 AP_Camera *camera();
 };
+
+#endif

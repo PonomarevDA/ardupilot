@@ -5,6 +5,8 @@
 #include "AP_Baro_CYPHAL.h"
 #include <AP_CANManager/AP_CANManager.h>
 #include <AP_CYPHAL/AP_CYPHAL.h>
+#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 #include "uavcan/si/sample/temperature/Scalar_1_0.h"
 #include "uavcan/si/sample/pressure/Scalar_1_0.h"
 

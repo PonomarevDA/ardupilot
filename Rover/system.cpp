@@ -25,11 +25,9 @@ void Rover::init_ardupilot()
 #endif
 
     // init gripper
-#if GRIPPER_ENABLED == ENABLED
+#if AP_GRIPPER_ENABLED
     g2.gripper.init();
 #endif
-
-    g2.fence.init();
 
     // initialise notify system
     notify.init();
@@ -37,8 +35,10 @@ void Rover::init_ardupilot()
 
     battery.init();
 
+#if AP_RPM_ENABLED
     // Initialise RPM sensor
     rpm_sensor.init();
+#endif
 
     rssi.init();
 
@@ -105,6 +105,11 @@ void Rover::init_ardupilot()
 #if HAL_MOUNT_ENABLED
     // initialise camera mount
     camera_mount.init();
+#endif
+
+#if PRECISION_LANDING == ENABLED
+    // initialise precision landing
+    init_precland();
 #endif
 
     /*
@@ -222,12 +227,14 @@ bool Rover::set_mode(Mode &new_mode, ModeReason reason)
 
     control_mode = &new_mode;
 
+#if AP_FENCE_ENABLED
     // pilot requested flight mode change during a fence breach indicates pilot is attempting to manually recover
     // this flight mode change could be automatic (i.e. fence, battery, GPS or GCS failsafe)
     // but it should be harmless to disable the fence temporarily in these situations as well
-    g2.fence.manual_recovery_start();
+    fence.manual_recovery_start();
+#endif
 
-#if CAMERA == ENABLED
+#if AP_CAMERA_ENABLED
     camera.set_is_auto_mode(control_mode->mode_number() == Mode::Number::AUTO);
 #endif
 

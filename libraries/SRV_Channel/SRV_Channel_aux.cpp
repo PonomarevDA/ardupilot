@@ -32,6 +32,7 @@ void SRV_Channel::output_ch(void)
 {
 #ifndef HAL_BUILD_AP_PERIPH
     int8_t passthrough_from = -1;
+    bool passthrough_mapped = false;
 
     // take care of special function cases
     switch(function.get())
@@ -42,6 +43,10 @@ void SRV_Channel::output_ch(void)
     case k_rcin1 ... k_rcin16: // rc pass-thru
         passthrough_from = int8_t((int16_t)function - k_rcin1);
         break;
+    case k_rcin1_mapped ... k_rcin16_mapped:
+        passthrough_from = int8_t((int16_t)function - k_rcin1_mapped);
+        passthrough_mapped = true;
+        break;
     }
     if (passthrough_from != -1) {
         // we are doing passthrough from input to output for this channel
@@ -50,7 +55,11 @@ void SRV_Channel::output_ch(void)
             if (SRV_Channels::passthrough_disabled()) {
                 output_pwm = c->get_radio_trim();
             } else {
-                const int16_t radio_in = c->get_radio_in();
+                // non-mapped rc passthrough
+                int16_t radio_in = c->get_radio_in();
+                if (passthrough_mapped) {
+                    radio_in = pwm_from_angle(c->norm_input_dz() * 4500);
+                }
                 if (!ign_small_rcin_changes) {
                     output_pwm = radio_in;
                     previous_radio_in = radio_in;
@@ -159,6 +168,7 @@ void SRV_Channel::aux_servo_function_setup(void)
     case k_roll_out:
     case k_pitch_out:
     case k_yaw_out:
+    case k_rcin1_mapped ... k_rcin16_mapped:
         set_angle(4500);
         break;
     case k_throttle:
@@ -280,12 +290,12 @@ void SRV_Channels::set_digital_outputs(uint32_t dig_mask, uint32_t rev_mask) {
     for (uint8_t i = 0; i < NUM_SERVO_CHANNELS; i++) {
         SRV_Channel &c = channels[i];
         if (digital_mask & (1U<<i)) {
-            c.servo_min.set(1000);
-            c.servo_max.set(2000);
+            c.servo_min.set_and_default(1000);
+            c.servo_max.set_and_default(2000);
             if (reversible_mask & (1U<<i)) {
-                c.servo_trim.set(1500);
+                c.servo_trim.set_and_default(1500);
             } else {
-                c.servo_trim.set(1000);
+                c.servo_trim.set_and_default(1000);
             }
         }
     }
@@ -518,7 +528,7 @@ bool SRV_Channels::set_aux_channel_default(SRV_Channel::Aux_servo_function_t fun
         return false;
     }
     channels[channel].type_setup = false;
-    channels[channel].function.set(function);
+    channels[channel].function.set_and_default(function);
     channels[channel].aux_servo_function_setup();
     function_mask.set((uint16_t)function);
     if (SRV_Channel::valid_function(function)) {
@@ -612,7 +622,7 @@ void SRV_Channels::set_trim_to_pwm_for(SRV_Channel::Aux_servo_function_t functio
 {
     for (uint8_t i=0; i<NUM_SERVO_CHANNELS; i++) {
         if (channels[i].function == function) {
-            channels[i].servo_trim.set(pwm);
+            channels[i].servo_trim.set_and_default(pwm);
         }
     }
 }
@@ -622,7 +632,7 @@ void SRV_Channels::set_trim_to_min_for(SRV_Channel::Aux_servo_function_t functio
 {
     for (uint8_t i=0; i<NUM_SERVO_CHANNELS; i++) {
         if (channels[i].function == function) {
-            channels[i].servo_trim.set((channels[i].get_reversed() && !ignore_reversed)?channels[i].servo_max:channels[i].servo_min);
+            channels[i].servo_trim.set_and_default((channels[i].get_reversed() && !ignore_reversed)?channels[i].servo_max:channels[i].servo_min);
         }
     }
 }
@@ -674,7 +684,7 @@ void SRV_Channels::adjust_trim(SRV_Channel::Aux_servo_function_t function, float
         } else if (change < 0 && trim_scaled > 0.4f) {
             new_trim--;
         } else {
-            return;
+            continue;
         }
         c.servo_trim.set(new_trim);
 
