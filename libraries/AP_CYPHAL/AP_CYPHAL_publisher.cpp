@@ -19,10 +19,14 @@
 
 #if HAL_ENABLE_CYPHAL_DRIVERS
 
+#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_CYPHAL/AP_CYPHAL_registers.h>
 
 
-void CyphalPublisherManager::init(CanardInstance &ins, CanardTxQueue& tx_queue)
+void CyphalPublisherManager::init(CanardInstance &ins,
+                                  CanardTxQueue& tx_queue,
+                                  const CyphalSubscriberManager& sub_manager)
 {
     CyphalBasePublisher *publisher;
 
@@ -30,7 +34,7 @@ void CyphalPublisherManager::init(CanardInstance &ins, CanardTxQueue& tx_queue)
     publisher = new CyphalHeartbeatPublisher(ins, tx_queue);
     add_publisher(publisher);
 
-    publisher = new CyphalPortListPublisher(ins, tx_queue);
+    publisher = new CyphalPortListPublisher(ins, tx_queue, *this, sub_manager);
     add_publisher(publisher);
 }
 
@@ -54,11 +58,25 @@ void CyphalPublisherManager::process_all()
     }
 }
 
+void CyphalPublisherManager::fill_publishers(uavcan_node_port_SubjectIDList_0_1& publishers_list) const
+{
+    uavcan_node_port_SubjectIDList_0_1_select_sparse_list_(&publishers_list);
+    int_fast8_t enabled_pub_amount = 0;
+    for (uint_fast8_t pub_idx = 0; pub_idx < number_of_publishers; pub_idx++) {
+        if (publishers[pub_idx]->is_enabled()) {
+            publishers_list.sparse_list.elements[enabled_pub_amount].value = publishers[pub_idx]->get_port_id();
+            enabled_pub_amount++;
+        }
+    }
+    publishers_list.sparse_list.count = enabled_pub_amount;
+}
+
 
 void CyphalBasePublisher::push(size_t buf_size, uint8_t* buf)
 {
     auto result = canardTxPush(&_tx_queue, &_canard, 0, &_transfer_metadata, buf_size, buf);
     if (result < 0) {
+        GCS_SEND_TEXT(MAV_SEVERITY_WARNING, "AP_CYPHAL: not enough mem: %ld", result);
         // An error has occurred: either an argument is invalid, the TX queue is full, or we've
         // run out of memory. It is possible to statically prove that an out-of-memory will
         // never occur for a given application if the heap is sized correctly; for background,
@@ -112,8 +130,13 @@ void CyphalHeartbeatPublisher::publish()
 /**
  * @note uavcan.node.port.List_0_1
  */
-CyphalPortListPublisher::CyphalPortListPublisher(CanardInstance &ins, CanardTxQueue& tx_queue) :
-    CyphalBasePublisher(ins, tx_queue, uavcan_node_port_List_0_1_FIXED_PORT_ID_)
+CyphalPortListPublisher::CyphalPortListPublisher(CanardInstance &ins,
+                                                 CanardTxQueue& tx_queue,
+                                                 const CyphalPublisherManager& pub_manager,
+                                                 const CyphalSubscriberManager& sub_manager) :
+    CyphalBasePublisher(ins, tx_queue, uavcan_node_port_List_0_1_FIXED_PORT_ID_),
+    _pub_manager(pub_manager),
+    _sub_manager(sub_manager)
 {
     _transfer_metadata.priority = CanardPriorityNominal;
     _transfer_metadata.transfer_kind = CanardTransferKindMessage;
@@ -134,16 +157,20 @@ void CyphalPortListPublisher::update()
 
 void CyphalPortListPublisher::publish()
 {
-    ///< @todo How much bits does it need? 8466?
-    // uint8_t buf[uavcan_node_port_List_0_1_SERIALIZATION_BUFFER_SIZE_BYTES_];
-    // size_t buf_size = uavcan_node_port_List_0_1_SERIALIZATION_BUFFER_SIZE_BYTES_;
-    // auto result = uavcan_node_port_List_0_1_serialize_(&msg, buf, &buf_size);
+    static uavcan_node_port_List_0_1 msg{};
 
-    // if (NUNAVUT_SUCCESS == result) {
-    //     push(buf_size, buf);
-    // }
+    _pub_manager.fill_publishers(msg.publishers);
+    _sub_manager.fill_subscribers(msg.subscribers);
 
-    // _transfer_metadata.transfer_id++;
+    static uint8_t buf[uavcan_node_port_List_0_1_EXTENT_BYTES_];
+    size_t buf_size = uavcan_node_port_List_0_1_EXTENT_BYTES_;
+    auto result = uavcan_node_port_List_0_1_serialize_(&msg, buf, &buf_size);
+
+    if (NUNAVUT_SUCCESS == result) {
+        push(buf_size, buf);
+    }
+
+    _transfer_metadata.transfer_id++;
 }
 
 #endif // HAL_ENABLE_CYPHAL_DRIVERS

@@ -70,6 +70,19 @@ void CyphalSubscriberManager::process_all(const CanardRxTransfer* transfer)
     }
 }
 
+void CyphalSubscriberManager::fill_subscribers(uavcan_node_port_SubjectIDList_0_1& subscribers_list) const
+{
+    uavcan_node_port_SubjectIDList_0_1_select_sparse_list_(&subscribers_list);
+
+    int_fast8_t enabled_sub_amount = 0;
+    for (uint_fast8_t sub_idx = 0; sub_idx < number_of_subscribers; sub_idx++) {
+        if (subscribers[sub_idx]->is_enabled()) {
+            subscribers_list.sparse_list.elements[enabled_sub_amount].value = subscribers[sub_idx]->get_port_id();
+            enabled_sub_amount++;
+        }
+    }
+    subscribers_list.sparse_list.count = enabled_sub_amount;
+}
 
 CanardPortID CyphalBaseSubscriber::get_port_id()
 {

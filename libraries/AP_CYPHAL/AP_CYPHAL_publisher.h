@@ -26,6 +26,8 @@
 #include "uavcan/node/port/List_0_1.h"
 #include "uavcan/node/GetInfo_1_0.h"
 
+#include <AP_CYPHAL/AP_CYPHAL_subscriber.h>
+
 
 class CyphalBasePublisher;
 
@@ -34,10 +36,12 @@ class CyphalPublisherManager
 {
 public:
     CyphalPublisherManager() {};
-    void init(CanardInstance &ins, CanardTxQueue& tx_queue);
+    void init(CanardInstance &ins, CanardTxQueue& tx_queue, const CyphalSubscriberManager& sub_manager);
 
     // return true in sucess, otherwise false
     bool add_publisher(CyphalBasePublisher *publisher);
+
+    void fill_publishers(uavcan_node_port_SubjectIDList_0_1& publishers) const;
 
     void process_all();
 private:
@@ -55,6 +59,10 @@ public:
     uint16_t get_port_id()
     {
         return _port_id;
+    }
+    bool is_enabled()
+    {
+        return (_port_id == 0 || _port_id > 8191) ? false : true;
     }
     virtual void update() = 0;
 
@@ -92,12 +100,17 @@ private:
 class CyphalPortListPublisher : public CyphalBasePublisher
 {
 public:
-    CyphalPortListPublisher(CanardInstance &ins, CanardTxQueue& tx_queue);
+    CyphalPortListPublisher(CanardInstance &ins,
+                            CanardTxQueue& tx_queue,
+                            const CyphalPublisherManager& pub_manager,
+                            const CyphalSubscriberManager& sub_manager);
     virtual void update() override;
 
 private:
     static constexpr uint32_t publish_period_ms = 3000;
     uint32_t next_publish_time_ms{publish_period_ms};
+    const CyphalPublisherManager& _pub_manager;
+    const CyphalSubscriberManager& _sub_manager;
     // uavcan_node_port_List_0_1 msg;   ///< @todo this data type requires too much memory
 
     void publish();
