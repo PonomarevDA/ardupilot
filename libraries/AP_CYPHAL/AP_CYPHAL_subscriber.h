@@ -27,7 +27,7 @@
 #include "uavcan/node/GetInfo_1_0.h"
 #include "uavcan/_register/Access_1_0.h"
 #include "uavcan/_register/List_1_0.h"
-
+#include "uavcan/node/port/SubjectIDList_0_1.h"
 
 class CyphalBaseSubscriber;
 
@@ -40,6 +40,7 @@ public:
     void init(CanardInstance &ins, CanardTxQueue& tx_queue);
     void process_all(const CanardRxTransfer *transfer);
     bool add_subscriber(CyphalBaseSubscriber *subsriber);
+    void fill_subscribers(uavcan_node_port_SubjectIDList_0_1& subscribers_list) const;
 private:
     static constexpr uint8_t max_number_of_subscribers = 25;
     uint8_t number_of_subscribers = 0;
@@ -55,6 +56,10 @@ public:
         _canard(&ins), _tx_queue(&tx_queue), _port_id(port_id) {};
 
     CanardPortID get_port_id();
+    bool is_enabled()
+    {
+        return (_port_id == 0 || _port_id > 8191) ? false : true;
+    }
     virtual void subscribe() = 0;
     virtual void handler(const CanardRxTransfer* transfer) = 0;
 protected:

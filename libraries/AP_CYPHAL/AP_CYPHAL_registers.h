@@ -70,10 +70,12 @@ enum CyphalRegister_t {
 class CyphalRegisters
 {
 public:
-    static constexpr uint8_t NUMBER_OF_REGISTERS = 33;
+    static constexpr uint8_t NUMBER_OF_INTEGER_REGISTERS = 33;
+    static constexpr uint8_t NUMBER_OF_STRING_REGISTERS = 11;
+    static constexpr uint8_t NUMBER_OF_REGISTERS = NUMBER_OF_INTEGER_REGISTERS + NUMBER_OF_STRING_REGISTERS;
     static constexpr uint16_t CYPHAL_INVALID_REGISTER_VALUE = 65535;
 
-    CyphalRegisters(AP_Int16 (&parameters_table)[NUMBER_OF_REGISTERS]) : _parameters_table(parameters_table) {
+    CyphalRegisters(AP_Int16 (&parameters_table)[NUMBER_OF_INTEGER_REGISTERS]) : _parameters_table(parameters_table) {
         if (!instance) {
             instance = this;
         }
@@ -93,7 +95,7 @@ public:
     void setPortIdByIndex(uint8_t register_index, int16_t value);
 
 private:
-    AP_Int16 (&_parameters_table)[NUMBER_OF_REGISTERS];
+    AP_Int16 (&_parameters_table)[NUMBER_OF_INTEGER_REGISTERS];
     static CyphalRegisters* instance;
 };
 
