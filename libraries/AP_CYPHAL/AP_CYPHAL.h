@@ -32,7 +32,7 @@
 #include "o1heap.h"
 
 #ifndef CYPHAL_TX_QUEUE_FRAME_SIZE
-#define CYPHAL_TX_QUEUE_FRAME_SIZE      768
+#define CYPHAL_TX_QUEUE_FRAME_SIZE      1536  /// 768, 1024 not enough for port.List
 #endif
 
 #ifndef CYPHAL_STACK_SIZE
@@ -40,7 +40,7 @@
 #endif
 
 #ifndef CYPHAL_HEAP_SIZE
-#define CYPHAL_HEAP_SIZE                (1024 * 4)
+#define CYPHAL_HEAP_SIZE                (1024 * 6)
 #endif
 
 

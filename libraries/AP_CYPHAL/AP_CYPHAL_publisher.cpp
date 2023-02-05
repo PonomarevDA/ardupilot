@@ -74,7 +74,7 @@ void CyphalPublisherManager::fill_publishers(uavcan_node_port_SubjectIDList_0_1&
 
 void CyphalBasePublisher::push(size_t buf_size, uint8_t* buf)
 {
-    const CanardMicrosecond tx_deadline_usec = AP_HAL::micros() + 5000;
+    const CanardMicrosecond tx_deadline_usec = AP_HAL::micros() + 50000;
     auto result = canardTxPush(&_tx_queue, &_canard, tx_deadline_usec, &_transfer_metadata, buf_size, buf);
     static uint32_t prev_gcs_send_time_ms{1000};
     static long unsigned int counter{0};
@@ -163,20 +163,20 @@ void CyphalPortListPublisher::update()
 
 void CyphalPortListPublisher::publish()
 {
-    // static uavcan_node_port_List_0_1 msg{};
+    static uavcan_node_port_List_0_1 msg{};
 
-    // _pub_manager.fill_publishers(msg.publishers);
-    // _sub_manager.fill_subscribers(msg.subscribers);
+    _pub_manager.fill_publishers(msg.publishers);
+    _sub_manager.fill_subscribers(msg.subscribers);
 
-    // static uint8_t buf[uavcan_node_port_List_0_1_EXTENT_BYTES_];
-    // size_t buf_size = uavcan_node_port_List_0_1_EXTENT_BYTES_;
-    // auto result = uavcan_node_port_List_0_1_serialize_(&msg, buf, &buf_size);
+    static uint8_t buf[uavcan_node_port_List_0_1_EXTENT_BYTES_];
+    size_t buf_size = uavcan_node_port_List_0_1_EXTENT_BYTES_;
+    auto result = uavcan_node_port_List_0_1_serialize_(&msg, buf, &buf_size);
 
-    // if (NUNAVUT_SUCCESS == result) {
-    //     // push(buf_size, buf);
-    // }
+    if (NUNAVUT_SUCCESS == result) {
+        push(buf_size, buf);
+    }
 
-    // _transfer_metadata.transfer_id++;
+    _transfer_metadata.transfer_id++;
 }
 
 #endif // HAL_ENABLE_CYPHAL_DRIVERS
