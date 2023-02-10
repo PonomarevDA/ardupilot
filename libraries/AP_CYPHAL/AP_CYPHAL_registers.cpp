@@ -62,7 +62,7 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.status_3.id"},
     {"uavcan.sub.dynamics_3.id"},
 
-    {"uavcan.sub.gps.pоint.id"},
+    {"uavcan.sub.gps.point.id"},
     {"uavcan.sub.gps.yaw.id"},
     {"uavcan.sub.gps.sats.id"},
     {"uavcan.sub.gps.status.id"},
@@ -79,7 +79,31 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.pub.setpoint.type"},
     {"uavcan.pub.readiness.type"},
 
-    {"uavcan.sub.gps.pоint.type"},
+    {"uavcan.sub.esc_heartbeat_0.type"},
+    {"uavcan.sub.feedback_0.type"},
+    {"uavcan.sub.power_0.type"},
+    {"uavcan.sub.status_0.type"},
+    {"uavcan.sub.dynamics_0.type"},
+
+    {"uavcan.sub.esc_heartbeat_1.type"},
+    {"uavcan.sub.feedback_1.type"},
+    {"uavcan.sub.power_1.type"},
+    {"uavcan.sub.status_1.type"},
+    {"uavcan.sub.dynamics_1.type"},
+
+    {"uavcan.sub.esc_heartbeat_2.type"},
+    {"uavcan.sub.feedback_2.type"},
+    {"uavcan.sub.power_2.type"},
+    {"uavcan.sub.status_2.type"},
+    {"uavcan.sub.dynamics_2.type"},
+
+    {"uavcan.sub.esc_heartbeat_3.type"},
+    {"uavcan.sub.feedback_3.type"},
+    {"uavcan.sub.power_3.type"},
+    {"uavcan.sub.status_3.type"},
+    {"uavcan.sub.dynamics_3.type"},
+
+    {"uavcan.sub.gps.point.type"},
     {"uavcan.sub.gps.yaw.type"},
     {"uavcan.sub.gps.sats.type"},
     {"uavcan.sub.gps.status.type"},
@@ -89,11 +113,38 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.baro.pres.type"},
 
     {"uavcan.sub.rng.range.type"},
+
+    {"uavcan.sub.gyro.type"},
+    {"uavcan.sub.accel.type"},
 };
 
 static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS> string_registers = {
     "reg.udral.service.actuator.common.sp.Vector4",
     "reg.udral.service.common.Readiness",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
 
     "reg.udral.physics.kinematics.geodetic.PointStateVarTs",
     "uavcan.si.sample.angle.Scalar",
@@ -104,6 +155,9 @@ static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS
     "uavcan.si.sample.temperature.Scalar",
     "uavcan.si.sample.pressure.Scalar",
     "uavcan.si.sample.length.Scalar",
+
+    "uavcan.si.sample.angular_velocity.Vector3",
+    "uavcan.si.sample.acceleration.Vector3",
 };
 
 bool CyphalRegisters::init(CyphalSubscriberManager &sub_manager, CanardInstance &ins, CanardTxQueue &tx_queue)

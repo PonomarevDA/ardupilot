@@ -75,7 +75,7 @@ class CyphalRegisters
 {
 public:
     static constexpr uint8_t NUMBER_OF_INTEGER_REGISTERS = 35;
-    static constexpr uint8_t NUMBER_OF_STRING_REGISTERS = 11;
+    static constexpr uint8_t NUMBER_OF_STRING_REGISTERS = 33;
     static constexpr uint8_t NUMBER_OF_REGISTERS = NUMBER_OF_INTEGER_REGISTERS + NUMBER_OF_STRING_REGISTERS;
     static constexpr uint16_t CYPHAL_INVALID_REGISTER_VALUE = 65535;
 
