@@ -40,7 +40,7 @@
 #endif
 
 #ifndef CYPHAL_HEAP_SIZE
-#define CYPHAL_HEAP_SIZE                (1024 * 3)
+#define CYPHAL_HEAP_SIZE                (1024 * 4)
 #endif
 
 
@@ -91,7 +91,7 @@ private:
     void processReceivedTransfer(const uint8_t iface_index, const CanardRxTransfer* transfer);
 
     ///< Application layer
-    AP_Int16 _parameters_table[CyphalRegisters::NUMBER_OF_REGISTERS];
+    AP_Int16 _parameters_table[CyphalRegisters::NUMBER_OF_INTEGER_REGISTERS];
 
     CyphalRegisters _registers;
     CyphalSubscriberManager subscriber_manager;

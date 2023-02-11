@@ -289,8 +289,8 @@ void AP_CYPHAL::init(uint8_t driver_index, bool enable_filters)
     _canard.node_id = 42;
     _tx_queue = canardTxInit(CYPHAL_TX_QUEUE_FRAME_SIZE, CANARD_MTU_CAN_CLASSIC);
 
-    publisher_manager.init(_canard, _tx_queue);
     subscriber_manager.init(_canard, _tx_queue);
+    publisher_manager.init(_canard, _tx_queue, subscriber_manager);
 
     _registers.init(subscriber_manager, _canard, _tx_queue);
     _esc_controller.init(subscriber_manager, publisher_manager, _canard, _tx_queue);
