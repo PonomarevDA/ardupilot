@@ -19,13 +19,16 @@
 
 #if HAL_ENABLE_CYPHAL_DRIVERS
 
+#include <array>
 #include "AP_CYPHAL.h"
 #include <AP_Param/AP_Param.h>
+#include <GCS_MAVLink/GCS.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 
 CyphalRegisters* CyphalRegisters::instance;
 
 struct RegisterCell {
-    uint8_t register_name[30];     // 30 should be enough, but this value might be increased
+    uint8_t register_name[35];
 };
 
 static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
@@ -58,8 +61,63 @@ static RegisterCell registers_table[CyphalRegisters::NUMBER_OF_REGISTERS] = {
     {"uavcan.sub.power.3.id"},
     {"uavcan.sub.status.3.id"},
     {"uavcan.sub.dynamics.3.id"},
+
+    {"uavcan.pub.setpoint.type"},
+    {"uavcan.pub.readiness.type"},
+
+    {"uavcan.sub.esc_heartbeat.0.type"},
+    {"uavcan.sub.feedback.0.type"},
+    {"uavcan.sub.power.0.type"},
+    {"uavcan.sub.status.0.type"},
+    {"uavcan.sub.dynamics.0.type"},
+
+    {"uavcan.sub.esc_heartbeat.1.type"},
+    {"uavcan.sub.feedback.1.type"},
+    {"uavcan.sub.power.1.type"},
+    {"uavcan.sub.status.1.type"},
+    {"uavcan.sub.dynamics.1.type"},
+
+    {"uavcan.sub.esc_heartbeat.2.type"},
+    {"uavcan.sub.feedback.2.type"},
+    {"uavcan.sub.power.2.type"},
+    {"uavcan.sub.status.2.type"},
+    {"uavcan.sub.dynamics.2.type"},
+
+    {"uavcan.sub.esc_heartbeat.3.type"},
+    {"uavcan.sub.feedback.3.type"},
+    {"uavcan.sub.power.3.type"},
+    {"uavcan.sub.status.3.type"},
+    {"uavcan.sub.dynamics.3.type"},
 };
 
+static const std::array<const char*, CyphalRegisters::NUMBER_OF_STRING_REGISTERS> string_registers = {
+    "reg.udral.service.actuator.common.sp.Vector4",
+    "reg.udral.service.common.Readiness",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
+
+    "None",
+    "reg.udral.service.actuator.common.Feedback",
+    "reg.udral.physics.electricity.PowerTs",
+    "reg.udral.service.actuator.common.Status",
+    "reg.udral.physics.dynamics.rotation.PlanarTs",
+};
 
 bool CyphalRegisters::init(CyphalSubscriberManager &sub_manager, CanardInstance &ins, CanardTxQueue &tx_queue)
 {
@@ -112,12 +170,12 @@ uint8_t CyphalRegisters::getRegisterNameByIndex(uint8_t register_index, uint8_t 
 
 int16_t CyphalRegisters::getPortIdByIndex(uint8_t param_idx)
 {
-    return (param_idx < NUMBER_OF_REGISTERS) ? _parameters_table[param_idx].get() : -1;
+    return (param_idx < NUMBER_OF_INTEGER_REGISTERS) ? _parameters_table[param_idx].get() : -1;
 }
 
 void CyphalRegisters::setPortIdByIndex(uint8_t param_idx, int16_t new_port_id)
 {
-    if (param_idx >= NUMBER_OF_REGISTERS) {
+    if (param_idx >= NUMBER_OF_INTEGER_REGISTERS) {
         return;
     }
 
@@ -149,6 +207,8 @@ int8_t CyphalRegisterAccessRequest::parseRequest(const CanardRxTransfer* transfe
 
 void CyphalRegisterAccessRequest::makeResponse(const CanardRxTransfer* transfer, int8_t reg_index)
 {
+    constexpr uint8_t EMPTY_TAG = 0;
+    constexpr uint8_t STRING_TAG = 1;
     constexpr uint8_t NATURAL16_TAG = 10;
 
     _transfer_metadata.remote_node_id = transfer->metadata.remote_node_id;
@@ -160,12 +220,18 @@ void CyphalRegisterAccessRequest::makeResponse(const CanardRxTransfer* transfer,
     }
 
     // On the next step the register will be read regardless of the outcome of the write operation
-    response_msg.value.natural16.value.count = 1;
-    response_msg.value._tag_ = NATURAL16_TAG;
-    if (reg_index < 0) {
-        response_msg.value.natural16.value.elements[0] = CyphalRegisters::CYPHAL_INVALID_REGISTER_VALUE;
-    } else {
+    if (reg_index < 0 || reg_index >= CyphalRegisters::NUMBER_OF_REGISTERS) {
+        response_msg.value._tag_ = EMPTY_TAG;
+        // response_msg.value.natural16.value.elements[0] = CyphalRegisters::CYPHAL_INVALID_REGISTER_VALUE;
+    } else if (reg_index < CyphalRegisters::NUMBER_OF_INTEGER_REGISTERS) {
+        response_msg.value._tag_ = NATURAL16_TAG;
+        response_msg.value.natural16.value.count = 1;
         response_msg.value.natural16.value.elements[0] = _registers.getPortIdByIndex(reg_index);
+    } else {
+        response_msg.value._tag_ = STRING_TAG;
+        auto str = string_registers[reg_index - CyphalRegisters::NUMBER_OF_INTEGER_REGISTERS];
+        response_msg.value._string.value.count = strlen(str);
+        memcpy(response_msg.value._string.value.elements, str, response_msg.value._string.value.count);
     }
 
     /// @note: It is not enough memory on stack, so use buffer as static
