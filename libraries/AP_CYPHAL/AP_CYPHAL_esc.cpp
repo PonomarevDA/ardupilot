@@ -66,21 +66,15 @@ bool CyphalEscController::init(CyphalSubscriberManager &sub_manager,
     for (auto esc_idx = 0; esc_idx < 4; esc_idx++) {
         port_id = _registers.getPortIdByIndex(power_register_indexes[esc_idx]);
         _sub_power[esc_idx] = new CyphalPowerSubscriber(ins, tx_queue, port_id, esc_idx);
-        if (!sub_manager.add_subscriber(_sub_power[esc_idx])) {
-            return false;
-        }
+        sub_manager.add_subscriber(_sub_power[esc_idx]);
 
         port_id = _registers.getPortIdByIndex(dynamics_register_indexes[esc_idx]);
         _sub_dynamics[esc_idx] = new CyphalDynamicsSubscriber(ins, tx_queue, port_id, esc_idx);
-        if (!sub_manager.add_subscriber(_sub_dynamics[esc_idx])) {
-            return false;
-        }
+        sub_manager.add_subscriber(_sub_dynamics[esc_idx]);
 
         port_id = _registers.getPortIdByIndex(status_register_indexes[esc_idx]);
         _sub_status[esc_idx] = new CyphalStatusSubscriber(ins, tx_queue, port_id, esc_idx);
-        if (!sub_manager.add_subscriber(_sub_status[esc_idx])) {
-            return false;
-        }
+        sub_manager.add_subscriber(_sub_status[esc_idx]);
     }
 
     _is_inited = true;
