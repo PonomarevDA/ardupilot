@@ -15,38 +15,37 @@ local next_readiness_pub_time_ms = 1000
 local setpoint_port_id = 2000
 local setpoint_transfer_id = 0
 
+local feedback_port_id = 2002
+
+
 local PARAM_TABLE_KEY = 42
 assert(param:add_table(PARAM_TABLE_KEY, "CYP_", 1), 'could not add param table')
 assert(param:add_param(PARAM_TABLE_KEY, 1, 'ENABLE', 1), 'could not add CYP_ENABLE param')
 
-function get_msg_id(port, node)
-  return uint32_t(2422210560) + port * 256 + node
+local next_log_time = 1000
+local loop_counter = 0
+
+function update()
+  spin_recv()
+  process_heartbeat()
+  process_readiness()
+  send_setpoint()
+
+  check_perfomance()
+
+  return update, 4 -- ms
 end
 
-function increment_transfer_id(transfer_id)
-  if transfer_id >= 31 then
-    return 0
-  else
-    return transfer_id + 1
+function spin_recv()
+  frame = driver1:read_frame()
+  while frame do
+    port_id = parse_frame(frame)
+    if port_id == HEARTBEAT_PORT_ID then
+    elseif port_id == feedback_port_id then
+      esc_rpm_callback(frame)
+    end
+    frame = driver1:read_frame()
   end
-end
-
-function create_tail_byte_for_single_frame_msg(transfer_id)
-  return 224 + transfer_id
-end
-
-function parse_frame(frame)
-  service_not_message = uint32_t(frame:id() >> 25) & 1
-  priority = uint32_t(frame:id() >> 26) & 7
-  if service_not_message:toint() > 0 then
-    src_node_id = uint32_t(frame:id()) & 127
-    dst_node_id = uint32_t(frame:id() >> 7) & 127
-    port_id = (uint32_t(frame:id() >> 14) & 511):toint()
-  else
-    src_node_id = uint32_t(frame:id()) & 127
-    port_id = (uint32_t(frame:id() >> 8) & 8191):toint()
-  end
-  return port_id
 end
 
 function process_heartbeat()
@@ -112,46 +111,74 @@ function send_setpoint()
   setpoint_transfer_id = increment_transfer_id(setpoint_transfer_id)
 end
 
-function esc_rpm_callback()
-  -- just dummy right now
+function check_perfomance()
+  loop_counter = loop_counter + 1
+  if next_log_time <= millis() then
+    next_log_time = millis() + 5000
+    gcs:send_text(6, string.format("LUA loop times: %i", loop_counter))
+    loop_counter = 0
+  end
+end
+
+function esc_rpm_callback(frame)
   esc_telem:update_rpm(0, 100, 1)
   esc_telem:update_rpm(1, 110, 2)
   esc_telem:update_rpm(2, 120, 3)
   esc_telem:update_rpm(3, 130, 5)
 end
 
-function spin_recv()
-  frame = driver1:read_frame()
-  while frame do
-    port_id = parse_frame(frame)
-    if port_id == HEARTBEAT_PORT_ID then
-      esc_rpm_callback()
-    end
-    frame = driver1:read_frame()
+function parse_frame(frame)
+  return parse_id(frame:id_signed())
+end
+
+-- Start of the specification related section
+function get_msg_id(port, node)
+  return uint32_t(2422210560) + port * 256 + node
+end
+
+function increment_transfer_id(transfer_id)
+  if transfer_id >= 31 then
+    return 0
+  else
+    return transfer_id + 1
   end
 end
 
-local next_log_time = 1000
-local loop_counter = 0
-function check_perfomance()
-  loop_counter = loop_counter + 1
-  if next_log_time <= millis() then
-    next_log_time = millis() + 1000
-    -- gcs:send_text(5, string.format("LUA loop times: %i", loop_counter))
-    loop_counter = 0
+function create_tail_byte_for_single_frame_msg(transfer_id)
+  return 224 + transfer_id
+end
+
+function parse_id(id)
+  service_not_message = (id >> 25) % 2
+  if service_not_message == 0 then
+    port_id = (id >> 8) % 8192
+  else
+    port_id = 8191
+  end
+  return port_id
+end
+-- End of the specification related section
+
+
+-- Start of the unit tests section
+function assert_eq(first_int, second_int)
+  if first_int ~= second_int then
+    gcs:send_text(5, string.format("Assert error %i ~= %i", first_int, second_int))
+  else
+    gcs:send_text(6, string.format("Assert has been passed"))
   end
 end
 
-function update()
-  spin_recv()
-  process_heartbeat()
-  process_readiness()
-  send_setpoint()
-
-  check_perfomance()
-
-  return update, 4
+function test_parse_id()
+  assert_eq(8191, parse_id(34067071))   -- srv, skip for a while
+  assert_eq(2002, parse_id(512639))     -- msg node_id=127, subject_id=2002 (synthetic)
+  assert_eq(2002, parse_id(275239551))  -- msg node_id=127, subject_id=2002 (real example)
 end
+-- End of the unit tests section
 
+
+-- Entry point
 gcs:send_text(5, "LUA Cyphal enabled!")
+gcs:send_text(5, "LUA Cyphal unit tests enabled!")
+test_parse_id()
 return update()
