@@ -2,25 +2,34 @@
 local driver1 = CAN:get_device(20)
 assert(driver1 ~= nil, 'No scripting CAN interfaces found')
 
-local node_id = 42
+local PARAM_TABLE_KEY = 42
+assert(param:add_table(PARAM_TABLE_KEY, "CYP_", 6), 'could not add param table')
+assert(param:add_param(PARAM_TABLE_KEY, 1, 'ENABLE', 1), 'could not add CYP_ENABLE param')
+assert(param:add_param(PARAM_TABLE_KEY, 2, 'NODE_ID', 127), 'could not add CYP_NODE_ID param')
+assert(param:add_param(PARAM_TABLE_KEY, 3, 'TESTS', 0), 'could not add CYP_TESTS param')
+assert(param:add_param(PARAM_TABLE_KEY, 4, 'SP', 65535), 'could not add CYP_SP param')
+assert(param:add_param(PARAM_TABLE_KEY, 5, 'RD', 65535), 'could not add CYP_RD param')
+assert(param:add_param(PARAM_TABLE_KEY, 6, 'FB', 65535), 'could not add CYP_FB param')
+
+local param_cyp_enable = Parameter("CYP_ENABLE")  -- 1 = enabled, 0 = disabled
+local param_cyp_tests = Parameter("CYP_TESTS")    -- 1 = enabled, 0 = disabled
+local node_id = Parameter("CYP_NODE_ID"):get()
 
 local HEARTBEAT_PORT_ID = 7509
 local heartbeat_transfer_id = 0
 local next_heartbeat_pub_time_ms = 1000
 
-local readiness_port_id = 2001
+local readiness_port_id = Parameter("CYP_RD"):get()
 local readiness_transfer_id = 0
 local next_readiness_pub_time_ms = 1000
 
-local setpoint_port_id = 2000
+local setpoint_port_id = Parameter("CYP_SP"):get()
 local setpoint_transfer_id = 0
 
-local feedback_port_id = 2002
+local feedback_port_id = Parameter("CYP_FB"):get()
 
-
-local PARAM_TABLE_KEY = 42
-assert(param:add_table(PARAM_TABLE_KEY, "CYP_", 1), 'could not add param table')
-assert(param:add_param(PARAM_TABLE_KEY, 1, 'ENABLE', 1), 'could not add CYP_ENABLE param')
+local UNUSED_PORT_ID = 65535
+local MAX_PORT_ID = 8191
 
 local next_log_time = 1000
 local loop_counter = 0
@@ -40,9 +49,8 @@ function spin_recv()
   frame = driver1:read_frame()
   while frame do
     port_id = parse_frame(frame)
-    if port_id == HEARTBEAT_PORT_ID then
-    elseif port_id == feedback_port_id then
-      esc_rpm_callback(frame)
+    if port_id == feedback_port_id then
+      esc_rpm_callback()
     end
     frame = driver1:read_frame()
   end
@@ -75,7 +83,9 @@ end
 
 function process_readiness()
   -- uint2 value
-
+  if readiness_port_id > MAX_PORT_ID then
+    return
+  end
   if next_readiness_pub_time_ms >= millis() then
     return
   end
@@ -120,7 +130,7 @@ function check_perfomance()
   end
 end
 
-function esc_rpm_callback(frame)
+function esc_rpm_callback()
   esc_telem:update_rpm(0, 100, 1)
   esc_telem:update_rpm(1, 110, 2)
   esc_telem:update_rpm(2, 120, 3)
@@ -153,7 +163,7 @@ function parse_id(id)
   if service_not_message == 0 then
     port_id = (id >> 8) % 8192
   else
-    port_id = 8191
+    port_id = UNUSED_PORT_ID
   end
   return port_id
 end
@@ -170,15 +180,20 @@ function assert_eq(first_int, second_int)
 end
 
 function test_parse_id()
-  assert_eq(8191, parse_id(34067071))   -- srv, skip for a while
-  assert_eq(2002, parse_id(512639))     -- msg node_id=127, subject_id=2002 (synthetic)
-  assert_eq(2002, parse_id(275239551))  -- msg node_id=127, subject_id=2002 (real example)
+  assert_eq(UNUSED_PORT_ID, parse_id(34067071)) -- srv, skip for a while
+  assert_eq(2002, parse_id(512639))             -- msg node_id=127, subject_id=2002 (synthetic)
+  assert_eq(2002, parse_id(275239551))          -- msg node_id=127, subject_id=2002 (real example)
 end
 -- End of the unit tests section
 
 
 -- Entry point
-gcs:send_text(5, "LUA Cyphal enabled!")
-gcs:send_text(5, "LUA Cyphal unit tests enabled!")
-test_parse_id()
-return update()
+if (param_cyp_tests:get() >= 1) then
+  gcs:send_text(5, "LUA Cyphal unit tests enabled!")
+  test_parse_id()
+end
+
+if (param_cyp_enable:get() >= 1) then
+  gcs:send_text(5, "LUA Cyphal enabled!")
+  return update()
+end
