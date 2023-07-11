@@ -1,10 +1,17 @@
 # Cyphal ESC Driver
 
-Reference: https://opencyphal.org/specification/Cyphal_Specification.pdf
+This driver implements support for Cyphal ESCs such as Myxa, kotleta20 and
+others. It supports:
+- [Heartbeat](https://github.com/OpenCyphal/public_regulated_data_types/blob/master/uavcan/node/7509.Heartbeat.1.0.dsdl),
+- [ESC service](https://github.com/OpenCyphal/public_regulated_data_types/blob/master/reg/udral/service/actuator/esc/_.0.1.dsdl) based on [setpoint](https://github.com/OpenCyphal/public_regulated_data_types/blob/master/reg/udral/service/actuator/common/sp/_.0.1.dsdl) and [readiness](https://github.com/OpenCyphal/public_regulated_data_types/blob/master/reg/udral/service/common/Readiness.0.1.dsdl)
+- [Telega/CompactFeedback](https://github.com/Zubax/zubax_dsdl/blob/master/zubax/telega/CompactFeedback.1.0.dsdl)
 
-## Parameters
+## How to use
 
-Please, consider the following paramers to enable scripting on CAN1:
+This driver should be loaded by placing the lua script in the
+APM/scripts directory on the microSD card, which can be done either
+directly or via MAVFTP. The following key parameters should be set to
+start the script and configure CAN driver:
 
 ||||
 |-|-|-|
@@ -12,19 +19,21 @@ Please, consider the following paramers to enable scripting on CAN1:
 | CAN_D1_PROTOCOL | 10 | 10 means scripting
 | CAN_P1_BITRATE  | 100000 | Default baudrate for most of the applications
 | CAN_P1_DRIVER   | First driver
-| CAN_D2_PROTOCOL | UAVCAN | Cyphal can coexist with DroneCAN on second bus
-| CAN_P2_BITRATE  | 100000
-| CAN_P2_DRIVER   | Second driver
 
-> Here, the second CAN is configured as DroneCAN. It is not necessary, but it is used as an illustration that Cyphal and DroneCAN can coexist on different buses.
+then the flight controller should be rebooted and parameters should be
+refreshed.
 
-The Cyphal inroduces the following parameters:
+Once loaded the Cyphal parameters will appear and should be configured:
 
 ||||
 |-|-|-|
 | CYP_ENABLE      | 1 | 1 means Cyphal is enabled, 0 means disabled
-| CYP_NODE_ID     | 1 | 1 means Cyphal is enabled, 0 means disabled
-| CYP_FB          | | ESC Feedback port id. Enabled if less then 8191, otherwise disabled.
-| CYP_RD          | | Readiness port id. Enabled if less then 8191, otherwise disabled.
-| CYP_SP          | | Setpoint port id. Enabled if less then 8191, otherwise disabled.
-| CYP_TESTS       | 0 | If set to 1, unit and performance tests will be runned at the beginning of the application.
+| CYP_NODE_ID     | 1-127 | Node identifier in Cyphal-network
+| CYP_FB          | 1-8191 | ESC Feedback port id. Enabled if less then 8191, otherwise disabled.
+| CYP_RD          | 1-8191 | Readiness port id. Enabled if less then 8191, otherwise disabled.
+| CYP_SP          | 1-8191 | Setpoint port id. Enabled if less then 8191, otherwise disabled.
+| CYP_TESTS       | 0 | If set to 1, self tests will be runned at the beginning of the application.
+
+## Links
+
+Reference: https://opencyphal.org/specification/Cyphal_Specification.pdf
