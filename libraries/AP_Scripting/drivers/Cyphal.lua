@@ -46,13 +46,16 @@ function update()
 end
 
 function spin_recv()
-  frame = driver1:read_frame()
-  while frame do
+  for _ = 0, 4 do
+    frame = driver1:read_frame()
+    if not frame then
+      return
+    end
+
     port_id = parse_frame(frame)
     if port_id == feedback_port_id then
       esc_rpm_callback()
     end
-    frame = driver1:read_frame()
   end
 end
 
