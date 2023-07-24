@@ -85,7 +85,7 @@ function process_heartbeat()
 end
 
 function process_readiness()
-  -- uint2 value
+  -- y sub 2343:reg.udral.service.common.Readiness
   if readiness_port_id > MAX_PORT_ID then
     return
   end
@@ -97,7 +97,12 @@ function process_readiness()
   msg = CANFrame()
   msg:id( get_msg_id(readiness_port_id, node_id) )
 
-  msg:data(0, 3) -- engaged
+  if arming:is_armed() then
+    msg:data(0, 3) -- ENGAGED
+  else
+    msg:data(0, 2) -- STANDBY
+  end
+
   msg:data(1, create_tail_byte_for_single_frame_msg(readiness_transfer_id))
   msg:dlc(2)
   driver1:write_frame(msg, 1000000)
