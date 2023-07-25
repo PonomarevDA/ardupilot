@@ -34,6 +34,10 @@ local MAX_PORT_ID = 8191
 local MOTOR_1_FUNC_IDX = 33
 local NUMBER_OF_MOTORS = 3
 
+local READINESS_STANDBY = 2
+local READINESS_ENGAGED = 3
+
+
 local next_log_time = 1000
 local loop_counter = 0
 
@@ -81,7 +85,7 @@ function process_heartbeat()
   msg:data(1, ((now_sec >> 8) & 255):toint())
   msg:data(2, ((now_sec >> 16) & 255):toint())
   msg:data(3, ((now_sec >> 24) & 255):toint())
-  msg:data(7, create_tail_byte_for_single_frame_msg(heartbeat_transfer_id))
+  msg:data(7, create_tail_byte(1, 1, heartbeat_transfer_id))
   msg:dlc(8)
   driver1:write_frame(msg, 1000000)
   heartbeat_transfer_id = increment_transfer_id(heartbeat_transfer_id)
@@ -101,12 +105,12 @@ function process_readiness()
   msg:id( get_msg_id(readiness_port_id, node_id) )
 
   if arming:is_armed() then
-    msg:data(0, 3) -- ENGAGED
+    msg:data(0, READINESS_ENGAGED)
   else
-    msg:data(0, 2) -- STANDBY
+    msg:data(0, READINESS_STANDBY)
   end
 
-  msg:data(1, create_tail_byte_for_single_frame_msg(readiness_transfer_id))
+  msg:data(1, create_tail_byte(1, 1, readiness_transfer_id))
   msg:dlc(2)
   driver1:write_frame(msg, 1000000)
   readiness_transfer_id = increment_transfer_id(readiness_transfer_id)
@@ -129,7 +133,7 @@ function send_setpoint()
     end
   end
 
-  msg:data(7, create_tail_byte_for_single_frame_msg(setpoint_transfer_id))
+  msg:data(7, create_tail_byte(1, 1, setpoint_transfer_id))
   msg:dlc(8)
   driver1:write_frame(msg, 1000000)
 
@@ -169,8 +173,38 @@ function increment_transfer_id(transfer_id)
   end
 end
 
-function create_tail_byte_for_single_frame_msg(transfer_id)
-  return 224 + transfer_id
+function get_number_of_frames_by_bytes(number_of_bytes)
+  -- =IF(BYTES>0;IF(BYTES>7;CEILING((BYTES+2)/7);1);)
+  number_of_frames = 0
+
+  if number_of_bytes <= 7 then
+    number_of_frames = 1
+  elseif number_of_bytes <= 12 then
+    number_of_frames = 2
+  elseif number_of_bytes <= 19 then
+    number_of_frames = 3
+  elseif number_of_bytes <= 26 then
+    number_of_frames = 4
+  end
+
+  return number_of_frames
+end
+
+function create_tail_byte(frame_num, number_of_frames, transfer_id)
+  -- transfer_id + toggle_bit (32) + end_of_transfer (64) + start_of_transfer (128)
+  tail_byte = transfer_id
+
+  if frame_num == 1 then
+    tail_byte = tail_byte + 128
+  end
+  if frame_num == number_of_frames then
+    tail_byte = tail_byte + 64
+  end
+  if (frame_num % 2) == 1 then
+    tail_byte = tail_byte + 32
+  end
+ 
+  return tail_byte
 end
 
 function parse_id(id)
@@ -198,6 +232,18 @@ function test_parse_id()
   assert_eq(UNUSED_PORT_ID, parse_id(34067071)) -- srv, skip for a while
   assert_eq(2002, parse_id(512639))             -- msg node_id=127, subject_id=2002 (synthetic)
   assert_eq(2002, parse_id(275239551))          -- msg node_id=127, subject_id=2002 (real example)
+
+  assert_eq(1, get_number_of_frames_by_bytes(7))
+  assert_eq(2, get_number_of_frames_by_bytes(8))
+  assert_eq(2, get_number_of_frames_by_bytes(12))
+  assert_eq(3, get_number_of_frames_by_bytes(13))
+  assert_eq(3, get_number_of_frames_by_bytes(19))
+  assert_eq(4, get_number_of_frames_by_bytes(20))
+
+  assert_eq(244, create_tail_byte(1, 1, 20))
+  assert_eq(174, create_tail_byte(1, 2, 14))
+  assert_eq(88, create_tail_byte(2, 2, 24))
+  assert_eq(13, create_tail_byte(2, 3, 13))
 end
 -- End of the unit tests section
 
