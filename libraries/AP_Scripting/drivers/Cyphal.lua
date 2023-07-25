@@ -28,8 +28,11 @@ local setpoint_transfer_id = 0
 
 local feedback_port_id = Parameter("CYP_FB"):get()
 
+-- Constants
 local UNUSED_PORT_ID = 65535
 local MAX_PORT_ID = 8191
+local MOTOR_1_FUNC_IDX = 33
+local NUMBER_OF_MOTORS = 3
 
 local next_log_time = 1000
 local loop_counter = 0
@@ -110,20 +113,24 @@ function process_readiness()
 end
 
 function send_setpoint()
-  -- y sub 2000:uavcan.primitive.scalar.Integer16
-  -- channels for quadcopter: 33-36
+  -- y sub 2342:uavcan.primitive.array.Integer16
+  -- y sub 2342:reg.udral.service.actuator.common.sp.Vector8
+  -- channels for quadcopter: 33-36 - pwm duration from 1000 us to 2000 us
 
   msg = CANFrame()
   msg:id(get_msg_id(setpoint_port_id, node_id))
 
-  pwm = SRV_Channels:get_output_pwm(33)
-  if (pwm ~= nil) then
-    msg:data(0, pwm % 256)
-    msg:data(1, (pwm >> 8) % 256)
+  msg:data(0, NUMBER_OF_MOTORS)
+  for motor_idx = 0, NUMBER_OF_MOTORS - 1 do
+    pwm_duration_us = SRV_Channels:get_output_pwm(MOTOR_1_FUNC_IDX + motor_idx)
+    if (pwm_duration_us ~= nil) then
+      msg:data(motor_idx * 2 + 1, pwm_duration_us % 256)
+      msg:data(motor_idx * 2 + 2, (pwm_duration_us >> 8) % 256)
+    end
   end
 
-  msg:data(2, create_tail_byte_for_single_frame_msg(setpoint_transfer_id))
-  msg:dlc(3)
+  msg:data(7, create_tail_byte_for_single_frame_msg(setpoint_transfer_id))
+  msg:dlc(8)
   driver1:write_frame(msg, 1000000)
 
   setpoint_transfer_id = increment_transfer_id(setpoint_transfer_id)
@@ -183,7 +190,7 @@ function assert_eq(first_int, second_int)
   if first_int ~= second_int then
     gcs:send_text(5, string.format("Assert error %i ~= %i", first_int, second_int))
   else
-    gcs:send_text(6, string.format("Assert has been passed"))
+    gcs:send_text(6, string.format("Assert has been passed %i", first_int))
   end
 end
 
