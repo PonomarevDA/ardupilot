@@ -26,7 +26,8 @@ local next_readiness_pub_time_ms = 1000
 local setpoint_port_id = Parameter("CYP_SP"):get()
 local setpoint_transfer_id = 0
 
-local feedback_port_id = Parameter("CYP_FB"):get()
+local first_esc_feedback_port_id = Parameter("CYP_FB"):get()
+local last_esc_feedback_port_id = first_esc_feedback_port_id + 7
 
 -- Constants
 local UNUSED_PORT_ID = 65535
@@ -60,8 +61,9 @@ function spin_recv()
     end
 
     port_id = parse_frame(frame)
-    if port_id == feedback_port_id then
-      esc_rpm_callback()
+    if port_id >= first_esc_feedback_port_id and port_id <= last_esc_feedback_port_id then
+      esc_idx = port_id - first_esc_feedback_port_id
+      esc_feedback_callback(frame, esc_idx)
     end
   end
 end
@@ -149,11 +151,27 @@ function check_perfomance()
   end
 end
 
-function esc_rpm_callback()
-  esc_telem:update_rpm(0, 100, 1)
-  esc_telem:update_rpm(1, 110, 2)
-  esc_telem:update_rpm(2, 120, 3)
-  esc_telem:update_rpm(3, 130, 5)
+function esc_feedback_parse_voltage(frame)
+  -- uint11 dc_voltage # [    0,+2047] * 0.2 = [     0,+409.4] volt
+  return ((frame:data(0)) + ((frame:data(1) % 8) << 8))
+end
+
+function esc_feedback_parse_dc_current(frame)
+  -- int12 dc_current # [-2048,+2047] * 0.2 = [-409.6,+409.4] ampere
+  return ((frame:data(1) >> 3) + ((frame:data(2) % 128) << 5))
+end
+
+function esc_feedback_parse_rpm(frame)
+  -- int13 velocity # [-4096,+4095] radian/second (approx. [-39114,+39104] RPM)
+  return ((frame:data(4) >> 3) + (frame:data(5) << 5))
+end
+
+function esc_feedback_callback(frame, esc_idx)
+  voltage_raw = esc_feedback_parse_voltage(frame)
+  current_raw = esc_feedback_parse_dc_current(frame)
+  rpm = esc_feedback_parse_rpm(frame)
+  -- gcs:send_text(6, string.format("ESC FB %i: V=%i, I=%i", esc_idx, voltage_raw, current_raw))
+  esc_telem:update_rpm(esc_idx, rpm, 0)
 end
 
 function parse_frame(frame)
@@ -245,6 +263,32 @@ function test_parse_id()
   assert_eq(88, create_tail_byte(2, 2, 24))
   assert_eq(13, create_tail_byte(2, 3, 13))
 end
+
+function test_esc_feedback()
+  frame = CANFrame()
+  frame:dlc(8)
+
+  frame:data(0, 0)
+  frame:data(1, 248)
+  assert_eq(0, esc_feedback_parse_voltage(frame))
+  frame:data(0, 255)
+  frame:data(1, 7)
+  assert_eq(2047, esc_feedback_parse_voltage(frame))
+
+  frame:data(1, 7)
+  frame:data(2, 0)
+  assert_eq(0, esc_feedback_parse_dc_current(frame))
+  frame:data(1, 248)
+  frame:data(2, 63)
+  assert_eq(2047, esc_feedback_parse_dc_current(frame))
+
+  frame:data(4, 0)
+  frame:data(5, 0)
+  assert_eq(0, esc_feedback_parse_rpm(frame))
+  frame:data(4, 248)
+  frame:data(5, 127)
+  assert_eq(4095, esc_feedback_parse_rpm(frame))
+end
 -- End of the unit tests section
 
 
@@ -252,6 +296,7 @@ end
 if (param_cyp_tests:get() >= 1) then
   gcs:send_text(5, "LUA Cyphal unit tests enabled!")
   test_parse_id()
+  test_esc_feedback()
 end
 
 if (param_cyp_enable:get() >= 1) then
