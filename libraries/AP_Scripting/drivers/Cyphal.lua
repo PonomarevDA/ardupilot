@@ -94,7 +94,6 @@ function process_heartbeat()
 end
 
 function process_readiness()
-  -- y sub 2343:reg.udral.service.common.Readiness
   if readiness_port_id > MAX_PORT_ID then
     return
   end
@@ -119,15 +118,7 @@ function process_readiness()
 end
 
 function send_setpoint()
-  -- y sub 2342:uavcan.primitive.array.Integer16
-  -- y sub 2342:reg.udral.service.actuator.common.sp.Vector8
-  -- channels for quadcopter: 33-36 - pwm duration from 1000 us to 2000 us
-
-  msg = CANFrame()
-  msg:id(get_msg_id(setpoint_port_id, node_id))
-
   local setpoints = {0, 0, 0, 0, 0, 0, 0, 0}
-  msg:data(0, NUMBER_OF_MOTORS)
   for motor_idx = 0, NUMBER_OF_MOTORS - 1 do
     pwm_duration_us = SRV_Channels:get_output_pwm(MOTOR_1_FUNC_IDX + motor_idx)
     setpoints[motor_idx + 1] = (pwm_duration_us - 1000) * 0.001
@@ -135,25 +126,7 @@ function send_setpoint()
 
   payload = {}
   payload_size = vector_serialize(setpoints, 8, payload)
-  can_data = {}
-  can_data_size = convert_payload_to_can_data(can_data, payload, payload_size, setpoint_transfer_id)
-
-  for can_data_idx = 0, can_data_size - 1 do
-    data_idx = can_data_idx % 8
-    msg:data(data_idx, can_data[can_data_idx + 1])
-
-    need_send = false
-    if data_idx == 7 or can_data_idx == can_data_size - 1 then
-      need_send = true
-    end
-
-    if need_send then
-      msg:dlc(data_idx + 1)
-      driver1:write_frame(msg, 1000000)
-      need_send = false
-    end
-  end
-
+  can_driver_send(payload, payload_size, setpoint_port_id)
   setpoint_transfer_id = increment_transfer_id(setpoint_transfer_id)
 end
 
@@ -197,6 +170,33 @@ function get_msg_id(port, node)
   return uint32_t(2422210560) + port * 256 + node
 end
 -- END OF THE APPLICATION SECTION
+
+-- cyphal_can_driver START OF THE SECTION
+function can_driver_send(payload, payload_size, port_id)
+  can_data = {}
+  can_data_size = convert_payload_to_can_data(can_data, payload, payload_size, setpoint_transfer_id)
+
+  msg = CANFrame()
+  msg:id(get_msg_id(port_id, node_id))
+
+  for can_data_idx = 0, can_data_size - 1 do
+    data_idx = can_data_idx % 8
+    msg:data(data_idx, can_data[can_data_idx + 1])
+
+    need_send = false
+    if data_idx == 7 or can_data_idx == can_data_size - 1 then
+      need_send = true
+    end
+
+    if need_send then
+      msg:dlc(data_idx + 1)
+      driver1:write_frame(msg, 1000000)
+      need_send = false
+    end
+  end
+end
+-- cyphal_can_driver END OF THE SECTION
+
 
 -- libcanard.lua START OF THE SECTION
 local UNUSED_PORT_ID = 65535
