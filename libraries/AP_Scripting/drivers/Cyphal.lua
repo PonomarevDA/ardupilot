@@ -118,6 +118,10 @@ function process_readiness()
 end
 
 function send_setpoint()
+  if setpoint_port_id > MAX_PORT_ID then
+    return
+  end
+
   local setpoints = {0, 0, 0, 0, 0, 0, 0, 0}
   for motor_idx = 0, NUMBER_OF_MOTORS - 1 do
     pwm_duration_us = SRV_Channels:get_output_pwm(MOTOR_1_FUNC_IDX + motor_idx)

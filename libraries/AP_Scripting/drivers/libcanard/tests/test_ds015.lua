@@ -88,5 +88,17 @@ function test_vector_serialize()
   end
 end
 
+function test_compact_feedback_deserialize()
+  assert_eq(0, compact_feedback_deserialize({0, 248, 0, 0, 0, 0, 0}, 7).voltage)
+  assert_eq(2047, compact_feedback_deserialize({255, 7, 0, 0, 0, 0, 0}, 7).voltage)
+
+  assert_eq(0, compact_feedback_deserialize({0, 7, 0, 0, 0, 0, 0}, 7).dc_current)
+  assert_eq(2047, compact_feedback_deserialize({0, 248, 63, 0, 0, 0, 0}, 7).dc_current)
+
+  assert_eq(0, compact_feedback_deserialize({0, 0, 0, 0, 0, 0, 0}, 7).rpm)
+  assert_eq(4095, compact_feedback_deserialize({0, 0, 0, 0, 248, 127, 0}, 7).rpm)
+end
+
 test_array_serialize()
 test_vector_serialize()
+test_compact_feedback_deserialize()

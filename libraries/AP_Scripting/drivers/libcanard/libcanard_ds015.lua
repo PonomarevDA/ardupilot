@@ -26,3 +26,30 @@ function vector_serialize(setpoints, motors_amount, payload)
 
   return motors_amount * 2
 end
+
+local function compact_feedback_deserialize_voltage(payload)
+  return (payload[1] + ((payload[2] % 8) << 8))
+end
+
+local function compact_feedback_deserialize_dc_current(payload)
+  return ((payload[2] >> 3) + ((payload[3] % 128) << 5))
+end
+
+local function compact_feedback_deserialize_rpm(payload)
+  return ((payload[5] >> 3) + (payload[6] << 5))
+end
+
+function compact_feedback_deserialize(payload, payload_size)
+  -- uint11 dc_voltage # [    0,+2047] * 0.2 = [     0,+409.4] volt
+  -- int12 dc_current  # [-2048,+2047] * 0.2 = [-409.6,+409.4] ampere
+  -- int13 velocity    # [-4096,+4095] radian/second (approx. [-39114,+39104] RPM)
+  local feedback = {}
+
+  if payload_size == 7 then
+    feedback.voltage = compact_feedback_deserialize_voltage(payload)
+    feedback.dc_current = compact_feedback_deserialize_dc_current(payload)
+    feedback.rpm = compact_feedback_deserialize_rpm(payload)
+  end
+
+  return feedback
+end
