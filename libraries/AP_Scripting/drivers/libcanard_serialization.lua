@@ -1,34 +1,34 @@
-function castFloatToInt32(float)
+function cast_float_to_int32(float)
   return string.unpack(">i4", string.pack(">f", float))
 end
 
-function castInt32ToFloat(int)
+function cast_int32_to_float(int)
   return string.unpack(">f", string.pack(">i4", int))
 end
 
-function castNativeFloatToFloat16(origin_float)
+function cast_native_float_to_float16(origin_native_float)
   local ROUND_MASK = 0xFFFFF000
-  local MAGIC_FLOAT = castInt32ToFloat(15 << 23)
+  local MAGIC_FLOAT = cast_int32_to_float(15 << 23)
 
-  local integer_representation = castFloatToInt32(origin_float)
+  local integer_representation = cast_float_to_int32(origin_native_float)
   integer_representation = integer_representation & ROUND_MASK
-  local new_float = castInt32ToFloat(integer_representation) * MAGIC_FLOAT
-  local new_float_int32 = castFloatToInt32(new_float) + 4096
+  local new_float = cast_int32_to_float(integer_representation) * MAGIC_FLOAT
+  local new_float_int32 = cast_float_to_int32(new_float) + 4096
   local int16 = new_float_int32 >> 13
 
   return int16
 end
 
 
-local function test_castNativeFloatToFloat16()
-  assert_eq(0, castNativeFloatToFloat16(0.0))
-  assert_eq(11878, castNativeFloatToFloat16(0.1))
-  assert_eq(15155, castNativeFloatToFloat16(0.9))
-  assert_eq(15360, castNativeFloatToFloat16(1.0))
+local function test_cast_native_float_to_float16()
+  assert_eq(0, cast_native_float_to_float16(0.0))
+  assert_eq(11878, cast_native_float_to_float16(0.1))
+  assert_eq(15155, cast_native_float_to_float16(0.9))
+  assert_eq(15360, cast_native_float_to_float16(1.0))
 end
 
 if not pcall(debug.getlocal, 4, 1) then
   print('Unit tests:')
   require 'libcanard_assets'
-  test_castNativeFloatToFloat16()
+  test_cast_native_float_to_float16()
 end
