@@ -1,4 +1,4 @@
-require 'libcanard_serialization'
+require 'libcanard_type_cast'
 require 'libcanard_crc16'
 
 function array_serialize(setpoints, motors_amount, payload)

@@ -348,7 +348,7 @@ function vector_serialize(setpoints, motors_amount, payload)
 end
 -- libcanard_ds015.lua END OF THE SECTION
 
--- libcanard_serialization.lua START OF THE SECTION
+-- libcanard_type_cast.lua START OF THE SECTION
 function cast_float_to_int32(float)
   return string.unpack(">i4", string.pack(">f", float))
 end
@@ -369,7 +369,7 @@ function cast_native_float_to_float16(origin_native_float)
 
   return int16
 end
--- libcanard_serialization.lua END OF THE SECTION
+-- libcanard_type_cast.lua END OF THE SECTION
 
 
 -- Entry point

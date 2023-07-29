@@ -1,5 +1,5 @@
 require 'libcanard_assert'
-require 'libcanard_serialization'
+require 'libcanard_type_cast'
 
 local function test_cast_native_float_to_float16()
   assert_eq(0, cast_native_float_to_float16(0.0))

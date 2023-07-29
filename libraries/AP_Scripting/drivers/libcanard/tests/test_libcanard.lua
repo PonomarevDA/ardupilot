@@ -1,5 +1,5 @@
 require 'libcanard'
-require 'libcanard_serialization'
+require 'libcanard_type_cast'
 require 'libcanard_crc16'
 require 'libcanard_ds015'
 require 'libcanard_assert'
