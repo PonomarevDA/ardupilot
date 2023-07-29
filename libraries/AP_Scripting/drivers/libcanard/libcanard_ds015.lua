@@ -18,7 +18,7 @@ end
 function vector_serialize(setpoints, motors_amount, payload)
   for motor_idx = 0, motors_amount - 1 do
     setpoint_f16 = cast_native_float_to_float16(setpoints[motor_idx + 1])
-    if (setpoint ~= nil) then
+    if (setpoint_f16 ~= nil) then
       payload[(motor_idx << 1) + 1] = setpoint_f16 % 256
       payload[(motor_idx << 1) + 2] = (setpoint_f16 >> 8) % 256
     end

@@ -30,7 +30,6 @@ function parse_id(id)
 end
 
 function create_tail_byte(frame_num, number_of_frames, transfer_id)
-  -- transfer_id + toggle_bit (32) + end_of_transfer (64) + start_of_transfer (128)
   tail_byte = transfer_id
 
   if frame_num == 1 then
@@ -72,4 +71,12 @@ function convert_payload_to_can_data(buffer, payload, payload_size, transfer_id)
   end
 
   return buffer_size
+end
+
+function increment_transfer_id(transfer_id)
+  if transfer_id >= 31 then
+    return 0
+  else
+    return transfer_id + 1
+  end
 end

@@ -30,7 +30,6 @@ local first_esc_feedback_port_id = Parameter("CYP_FB"):get()
 local last_esc_feedback_port_id = first_esc_feedback_port_id + 7
 
 -- Constants
-local UNUSED_PORT_ID = 65535
 local MAX_PORT_ID = 8191
 local MOTOR_1_FUNC_IDX = 33
 local NUMBER_OF_MOTORS = 3
@@ -42,6 +41,7 @@ local READINESS_ENGAGED = 3
 local next_log_time = 1000
 local loop_counter = 0
 
+-- START APPLICATION SECTION
 function update()
   spin_recv()
   process_heartbeat()
@@ -126,18 +126,33 @@ function send_setpoint()
   msg = CANFrame()
   msg:id(get_msg_id(setpoint_port_id, node_id))
 
+  local setpoints = {0, 0, 0, 0, 0, 0, 0, 0}
   msg:data(0, NUMBER_OF_MOTORS)
   for motor_idx = 0, NUMBER_OF_MOTORS - 1 do
     pwm_duration_us = SRV_Channels:get_output_pwm(MOTOR_1_FUNC_IDX + motor_idx)
-    if (pwm_duration_us ~= nil) then
-      msg:data(motor_idx * 2 + 1, pwm_duration_us % 256)
-      msg:data(motor_idx * 2 + 2, (pwm_duration_us >> 8) % 256)
-    end
+    setpoints[motor_idx + 1] = (pwm_duration_us - 1000) * 0.001
   end
 
-  msg:data(7, create_tail_byte(1, 1, setpoint_transfer_id))
-  msg:dlc(8)
-  driver1:write_frame(msg, 1000000)
+  payload = {}
+  payload_size = vector_serialize(setpoints, 8, payload)
+  can_data = {}
+  can_data_size = convert_payload_to_can_data(can_data, payload, payload_size, setpoint_transfer_id)
+
+  for can_data_idx = 0, can_data_size - 1 do
+    data_idx = can_data_idx % 8
+    msg:data(data_idx, can_data[can_data_idx + 1])
+
+    need_send = false
+    if data_idx == 7 or can_data_idx == can_data_size - 1 then
+      need_send = true
+    end
+
+    if need_send then
+      msg:dlc(data_idx + 1)
+      driver1:write_frame(msg, 1000000)
+      need_send = false
+    end
+  end
 
   setpoint_transfer_id = increment_transfer_id(setpoint_transfer_id)
 end
@@ -178,20 +193,15 @@ function parse_frame(frame)
   return parse_id(frame:id_signed())
 end
 
--- Start of the specification related section
 function get_msg_id(port, node)
   return uint32_t(2422210560) + port * 256 + node
 end
+-- END OF THE APPLICATION SECTION
 
-function increment_transfer_id(transfer_id)
-  if transfer_id >= 31 then
-    return 0
-  else
-    return transfer_id + 1
-  end
-end
+-- libcanard.lua START OF THE SECTION
+local UNUSED_PORT_ID = 65535
 
-function get_number_of_frames_by_bytes(number_of_bytes)
+function get_number_of_frames_by_payload_size(number_of_bytes)
   -- =IF(BYTES>0;IF(BYTES>7;CEILING((BYTES+2)/7);1);)
   number_of_frames = 0
 
@@ -208,8 +218,17 @@ function get_number_of_frames_by_bytes(number_of_bytes)
   return number_of_frames
 end
 
+function parse_id(id)
+  service_not_message = (id >> 25) % 2
+  if service_not_message == 0 then
+    port_id = (id >> 8) % 8192
+  else
+    port_id = UNUSED_PORT_ID
+  end
+  return port_id
+end
+
 function create_tail_byte(frame_num, number_of_frames, transfer_id)
-  -- transfer_id + toggle_bit (32) + end_of_transfer (64) + start_of_transfer (128)
   tail_byte = transfer_id
 
   if frame_num == 1 then
@@ -225,16 +244,44 @@ function create_tail_byte(frame_num, number_of_frames, transfer_id)
   return tail_byte
 end
 
-function parse_id(id)
-  service_not_message = (id >> 25) % 2
-  if service_not_message == 0 then
-    port_id = (id >> 8) % 8192
-  else
-    port_id = UNUSED_PORT_ID
+function convert_payload_to_can_data(buffer, payload, payload_size, transfer_id)
+  number_of_frames = get_number_of_frames_by_payload_size(payload_size)
+  buffer_size = 0
+  tail_byte_counter = 0
+  for payload_idx = 1, payload_size do
+    if payload_idx % 7 == 1 and buffer_size ~= 0 then
+      buffer_size = buffer_size + 1
+      tail_byte_counter = tail_byte_counter + 1
+      buffer[buffer_size] = create_tail_byte(tail_byte_counter, number_of_frames, transfer_id)
+    end
+    buffer_size = buffer_size + 1
+    buffer[buffer_size] = payload[payload_idx]
   end
-  return port_id
+
+  if number_of_frames > 1 then
+    crc = calc_crc16(payload, payload_size)
+    buffer_size = buffer_size + 1
+    buffer[buffer_size] = crc >> 8
+    buffer_size = buffer_size + 1
+    buffer[buffer_size] = crc % 256
+    buffer_size = buffer_size + 1
+    tail_byte_counter = tail_byte_counter + 1
+    buffer[buffer_size] = create_tail_byte(tail_byte_counter, number_of_frames, transfer_id)
+  end
+
+  return buffer_size
 end
 
+function increment_transfer_id(transfer_id)
+  if transfer_id >= 31 then
+    return 0
+  else
+    return transfer_id + 1
+  end
+end
+-- libcanard.lua END OF THE SECTION
+
+-- libcanard_crc16.lua START OF THE SECTION
 local CRC16_LOOKUP = {
   0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7, 0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C,
   0xD1AD, 0xE1CE, 0xF1EF, 0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6, 0x9339, 0x8318,
@@ -271,33 +318,63 @@ function calc_crc16(byte_array, num_bytes)
   end
   return crc
 end
+-- libcanard_crc16.lua END OF THE SECTION
 
--- End of the specification related section
+-- libcanard_ds015.lua END OF THE SECTION
+function array_serialize(setpoints, motors_amount, payload)
+  payload[1] = motors_amount
 
-
--- Start of the unit tests section
-function assert_eq(first_int, second_int)
-  if first_int ~= second_int then
-    gcs:send_text(5, string.format("Assert error %i ~= %i", first_int, second_int))
-  else
-    gcs:send_text(6, string.format("Assert has been passed %i", first_int))
+  for motor_num = 1, motors_amount do
+    setpoint = setpoints[motor_num]
+    if (setpoint ~= nil) then
+      payload[motor_num << 1] = setpoint % 256
+      payload[(motor_num << 1) + 1] = (setpoint >> 8) % 256
+    end
   end
+
+  return 1 + 2 * motors_amount
 end
 
-function test_crc16()
-  assert_eq(62800, crc16_add_byte(0xFFFF, 0xAA))
-  assert_eq(34620, crc16_add_byte(62800, 0x42))
+function vector_serialize(setpoints, motors_amount, payload)
+  for motor_idx = 0, motors_amount - 1 do
+    setpoint_f16 = cast_native_float_to_float16(setpoints[motor_idx + 1])
+    if (setpoint_f16 ~= nil) then
+      payload[(motor_idx << 1) + 1] = setpoint_f16 % 256
+      payload[(motor_idx << 1) + 2] = (setpoint_f16 >> 8) % 256
+    end
+  end
 
-  local byte_array = {0xAA, 0x42}
-  assert_eq(34620, calc_crc16(byte_array, 2))
+  return motors_amount * 2
 end
--- End of the unit tests section
+-- libcanard_ds015.lua END OF THE SECTION
+
+-- libcanard_serialization.lua START OF THE SECTION
+function cast_float_to_int32(float)
+  return string.unpack(">i4", string.pack(">f", float))
+end
+
+function cast_int32_to_float(int)
+  return string.unpack(">f", string.pack(">i4", int))
+end
+
+function cast_native_float_to_float16(origin_native_float)
+  local ROUND_MASK = 0xFFFFF000
+  local MAGIC_FLOAT = cast_int32_to_float(15 << 23)
+
+  local integer_representation = cast_float_to_int32(origin_native_float)
+  integer_representation = integer_representation & ROUND_MASK
+  local new_float = cast_int32_to_float(integer_representation) * MAGIC_FLOAT
+  local new_float_int32 = cast_float_to_int32(new_float) + 4096
+  local int16 = new_float_int32 >> 13
+
+  return int16
+end
+-- libcanard_serialization.lua END OF THE SECTION
 
 
 -- Entry point
 if (param_cyp_tests:get() >= 1) then
   gcs:send_text(5, "LUA Cyphal unit tests enabled!")
-  test_crc16()
 end
 
 if (param_cyp_enable:get() >= 1) then
