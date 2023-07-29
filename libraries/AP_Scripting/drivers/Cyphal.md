@@ -37,3 +37,27 @@ Once loaded the Cyphal parameters will appear and should be configured:
 ## Links
 
 Reference: https://opencyphal.org/specification/Cyphal_Specification.pdf
+
+## Which firmware to use?
+
+You can use the latest official firmware.
+
+A hint how to build and upload for CUAVv5:
+
+```
+./waf list_boards
+./waf configure --board CUAVv5
+./waf copter
+./waf --targets bin/arducopter --upload
+```
+
+## Debugging with Yakut
+
+```
+y sub 2343:reg.udral.service.common.Readiness
+y sub 2342:reg.udral.service.actuator.common.sp.Vector8
+```
+
+## Known issues
+
+`Insufficent memory loading`. Try to disable some feature as it is recommended on [the ardupilot forum](https://discuss.ardupilot.org/t/lua-script-pre-arm-error/86834). For example, `LOG_FILE_BUFSIZE = 8` can help.
