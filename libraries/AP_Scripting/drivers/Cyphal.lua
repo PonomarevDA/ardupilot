@@ -32,7 +32,7 @@ local last_esc_feedback_port_id = first_esc_feedback_port_id + 7
 -- Constants
 local MAX_PORT_ID = 8191
 local MOTOR_1_FUNC_IDX = 33
-local NUMBER_OF_MOTORS = 3
+local MAX_NUMBER_OF_MOTORS = 8
 
 local READINESS_STANDBY = 2
 local READINESS_ENGAGED = 3
@@ -123,13 +123,18 @@ function send_setpoint()
   end
 
   local setpoints = {0, 0, 0, 0, 0, 0, 0, 0}
-  for motor_idx = 0, NUMBER_OF_MOTORS - 1 do
+  local number_of_motors = 0
+  for motor_idx = 0, MAX_NUMBER_OF_MOTORS - 1 do
     pwm_duration_us = SRV_Channels:get_output_pwm(MOTOR_1_FUNC_IDX + motor_idx)
+    if (pwm_duration_us == nil) then
+      break
+    end
     setpoints[motor_idx + 1] = (pwm_duration_us - 1000) * 0.001
+    number_of_motors = number_of_motors + 1
   end
 
   payload = {}
-  payload_size = vector_serialize(setpoints, 8, payload)
+  payload_size = vector_serialize(setpoints, number_of_motors, payload)
   can_driver_send(payload, payload_size, setpoint_port_id)
   setpoint_transfer_id = increment_transfer_id(setpoint_transfer_id)
 end
@@ -138,7 +143,7 @@ function check_perfomance()
   loop_counter = loop_counter + 1
   if next_log_time <= millis() then
     next_log_time = millis() + 5000
-    gcs:send_text(6, string.format("LUA loop times: %i", loop_counter))
+    -- gcs:send_text(6, string.format("LUA loop times: %i", loop_counter))
     loop_counter = 0
   end
 end
