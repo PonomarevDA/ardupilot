@@ -39,6 +39,7 @@
 #include "AP_InertialSensor_Invensensev3.h"
 #include "AP_InertialSensor_NONE.h"
 #include "AP_InertialSensor_SCHA63T.h"
+#include "AP_InertialSensor_DRONECAN.h"
 
 /* Define INS_TIMING_DEBUG to track down scheduling issues with the main loop.
  * Output is on the debug console. */
@@ -681,6 +682,15 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_RAW_LOG_OPT", 56, AP_InertialSensor, raw_logging_options, 0),
 
+#if AP_INS_DRONECAN_ENABLED
+    // @Param: _DRONECAN_HITL
+    // @DisplayName: DroneCAN HITL IMU option
+    // @Description: DroneCAN uavcan.equipment.ahrs.RawIMU subscriber: enable or disable
+    // @Bitmask: 0:Disable, 1:Enable
+    // @User: Advanced
+    AP_GROUPINFO("_DRONECAN", 57, AP_InertialSensor, dronecan_hitl, 0),
+#endif
+
     /*
       NOTE: parameter indexes have gaps above. When adding new
       parameters check for conflicts carefully
@@ -1172,6 +1182,12 @@ AP_InertialSensor::detect_backends(void)
     }
 #endif
 
+#if AP_INS_DRONECAN_ENABLED
+    if (dronecan_hitl == 1 && AP_InertialSensor_DRONECAN::instances_amount == 0) {
+        ADD_BACKEND(new AP_InertialSensor_DRONECAN(*this));
+    }
+#endif
+
 #if AP_SIM_INS_ENABLED
     for (uint8_t i=0; i<AP::sitl()->imu_count; i++) {
         ADD_BACKEND(AP_InertialSensor_SITL::detect(*this, i==1?INS_SITL_SENSOR_B:INS_SITL_SENSOR_A));
@@ -1552,26 +1568,26 @@ failed:
 /*
   check if the accelerometers are calibrated in 3D and that current number of accels matched number when calibrated
  */
-bool AP_InertialSensor::accel_calibrated_ok_all() const
+int8_t AP_InertialSensor::accel_calibrated_ok_all() const
 {
     // check each accelerometer has offsets saved
     for (uint8_t i=0; i<get_accel_count(); i++) {
         if (!_accel_id_ok[i]) {
-            return false;
+            return -1;
         }
         // exactly 0.0 offset is extremely unlikely
         if (_accel_offset(i).get().is_zero()) {
-            return false;
+            return -2;
         }
         // zero scaling also indicates not calibrated
         if (_accel_scale(i).get().is_zero()) {
-            return false;
+            return -3;
         }
     }
     for (uint8_t i=get_accel_count(); i<INS_MAX_INSTANCES; i++) {
         if (_accel_id(i) != 0) {
             // missing accel
-            return false;
+            return -4;
         }
     }
     
@@ -1582,13 +1598,13 @@ bool AP_InertialSensor::accel_calibrated_ok_all() const
             bool have_scaling = (!is_zero(scaling.x) && !is_equal(scaling.x,1.0f)) || (!is_zero(scaling.y) && !is_equal(scaling.y,1.0f)) || (!is_zero(scaling.z) && !is_equal(scaling.z,1.0f));
             bool have_offsets = !_accel_offset(i).get().is_zero();
             if (have_scaling || have_offsets) {
-                return false;
+                return -5;
             }
         }
     }
 
     // if we got this far the accelerometers must have been calibrated
-    return true;
+    return 1;
 }
 
 // return true if accel instance should be used (must be healthy and have it's use parameter set to 1)

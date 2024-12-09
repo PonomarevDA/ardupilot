@@ -147,7 +147,7 @@ public:
     bool get_accel_health(void) const { return get_accel_health(_primary_accel); }
     bool get_accel_health_all(void) const;
     uint8_t get_accel_count(void) const { return MIN(INS_MAX_INSTANCES, _accel_count); }
-    bool accel_calibrated_ok_all() const;
+    int8_t accel_calibrated_ok_all() const;
     bool use_accel(uint8_t instance) const;
 
     // get observed sensor rates, including any internal sampling multiplier
@@ -794,6 +794,8 @@ private:
     bool raw_logging_option_set(RAW_LOGGING_OPTION option) const {
         return (raw_logging_options.get() & int32_t(option)) != 0;
     }
+
+    AP_Int16 dronecan_hitl;
 };
 
 namespace AP {

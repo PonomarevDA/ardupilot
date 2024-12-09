@@ -40,6 +40,7 @@
 #include <AP_GPS/AP_GPS.h>
 #include <AP_BattMonitor/AP_BattMonitor_DroneCAN.h>
 #include <AP_Compass/AP_Compass_DroneCAN.h>
+#include <AP_InertialSensor/AP_InertialSensor_DRONECAN.h>
 #include <AP_Airspeed/AP_Airspeed_DroneCAN.h>
 #include <AP_Proximity/AP_Proximity_DroneCAN.h>
 #include <SRV_Channel/SRV_Channel.h>
@@ -359,6 +360,9 @@ void AP_DroneCAN::init(uint8_t driver_index, bool enable_filters)
     }
 
     // Roundup all subscribers from supported drivers
+#if AP_INS_DRONECAN_ENABLED
+    AP_InertialSensor_DRONECAN::subscribe_msgs(this);
+#endif
 #if AP_GPS_DRONECAN_ENABLED
     AP_GPS_DroneCAN::subscribe_msgs(this);
 #endif
